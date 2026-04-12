@@ -5,14 +5,16 @@ Three-node LangGraph pipeline that runs after document ingestion:
 
   librarian  →  calculator  →  auditor
       │               │            │
-  Queries KG     LLM writes    Gap analysis
-  for rules      Python code,  against rules +
-  & standards    executes it   computed metrics
+  Queries rules    LLM writes    Gap analysis
+  ChromaDB +       Python code,  against rules +
+  doc KG           executes it   computed metrics
 
-Exports
--------
-- analysis_pipeline : compiled LangGraph pipeline (ainvoke-able)
-- AnalysisState     : TypedDict for state hand-off
+Changes from v2.1
+-----------------
+- librarian_node now queries the persistent RULES ChromaDB store first,
+  then the document-specific LightRAG KG. Rules and document knowledge
+  are combined and clearly labelled for the auditor.
+- All models switched to gemini-2.5-flash (pro free tier limit was 0 RPD).
 """
 
 import ast
@@ -33,21 +35,21 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from lightrag import LightRAG
 from lightrag.utils import EmbeddingFunc
 
-# FIX: LightRAG requires QueryParam for query configuration — a plain dict
-# does not work and silently falls back to default (naive) mode.
 try:
     from lightrag.base import QueryParam
 except ImportError:
-    # Older LightRAG versions expose it at the top level
     from lightrag import QueryParam  # type: ignore[no-redef]
 
-# Shared helpers from Step 1  (file is named agent.py — fixed import)
 from agent import (
     gemini_complete, gemini_embed,
     WORKING_DIR, EMBEDDING_DIM,
     _invoke_with_retry, _is_retryable,
     api_key,
 )
+
+# Rules knowledge base (pre-ingested once, queried every run)
+from rules_store import query_rules
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # State
@@ -88,10 +90,6 @@ def _safe_globals() -> dict:
 
 
 def safe_python_executor(code: str) -> dict:
-    """
-    Execute *code* in a sandboxed namespace.
-    Returns {"success": bool, "output": str, "error": str}.
-    """
     stdout_buf = io.StringIO()
     stderr_buf = io.StringIO()
 
@@ -122,17 +120,43 @@ def safe_python_executor(code: str) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Node 1 – Librarian  (LightRAG retrieval)
+# Node 1 – Librarian
+# Queries BOTH:
+#   (A) Pre-defined rules ChromaDB  — standards that apply to every audit
+#   (B) Document-specific LightRAG KG — entities extracted from the PDF
 # ──────────────────────────────────────────────────────────────────────────────
 async def librarian_node(state: AnalysisState) -> dict:
     """
-    Query the LightRAG Knowledge Graph for compliance rules, financial
-    thresholds, and risk indicators using QueryParam (not a plain dict).
+    Two-source retrieval:
+    1. Rules ChromaDB  → compliance standards uploaded once by the user
+    2. LightRAG KG     → entities/relationships from the current document
     """
     if state.get("status") == "failed":
         return state
 
     try:
+        # ── Part A: Query the pre-defined rules knowledge base ──────────────
+        rule_queries = [
+            "regulatory compliance requirements and applicable standards for financial audit",
+            "financial reporting thresholds ratios capital adequacy benchmarks",
+            "internal control requirements risk assessment and audit materiality criteria",
+        ]
+
+        # Run all three rule queries concurrently
+        rule_results = await asyncio.gather(
+            *[query_rules(q, n_results=4) for q in rule_queries],
+            return_exceptions=True,
+        )
+
+        rules_section = "## COMPLIANCE RULES & REGULATORY STANDARDS\n"
+        rules_section += "(Retrieved from pre-ingested rules knowledge base)\n\n"
+        for q, r in zip(rule_queries, rule_results):
+            if isinstance(r, Exception):
+                rules_section += f"[Query failed: {q}]\n"
+            else:
+                rules_section += f"### Query: {q}\n{r}\n\n"
+
+        # ── Part B: Query the document-specific LightRAG KG ─────────────────
         rag = LightRAG(
             working_dir=WORKING_DIR,
             llm_model_func=gemini_complete,
@@ -144,19 +168,21 @@ async def librarian_node(state: AnalysisState) -> dict:
         )
         await rag.initialize_storages()
 
-        queries = [
-            "What are the specific regulatory compliance requirements and standards referenced?",
-            "What financial reporting thresholds, ratios, or benchmarks are mentioned?",
-            "What internal control weaknesses, risk factors, or audit criteria are identified?",
+        doc_queries = [
+            "What financial figures, accounts, and monetary amounts are reported?",
+            "What entities, subsidiaries, or related parties are mentioned?",
+            "What risk factors or contingent liabilities are disclosed?",
         ]
 
-        results = []
-        for q in queries:
-            # FIX: use QueryParam object — plain dict was silently ignored
-            answer = await rag.aquery(q, param=QueryParam(mode="hybrid"))
-            results.append(f"[Query: {q}]\n{answer}")
+        doc_section = "## DOCUMENT-SPECIFIC KNOWLEDGE (from ingested financial document)\n\n"
+        for q in doc_queries:
+            try:
+                answer = await rag.aquery(q, param=QueryParam(mode="hybrid"))
+                doc_section += f"### {q}\n{answer}\n\n"
+            except Exception as exc:
+                doc_section += f"### {q}\n[Query failed: {exc}]\n\n"
 
-        combined = ("\n\n" + "─" * 60 + "\n\n").join(results)
+        combined = rules_section + "\n" + ("═" * 60) + "\n\n" + doc_section
         return {"compliance_rules": combined, "status": "rules_fetched"}
 
     except Exception as exc:
@@ -164,7 +190,7 @@ async def librarian_node(state: AnalysisState) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Node 2 – Python Interpreter  (financial calculations)
+# Node 2 – Python Interpreter
 # ──────────────────────────────────────────────────────────────────────────────
 _CODE_GEN_SYSTEM = """\
 You are a financial data scientist specialising in audit analytics.
@@ -180,7 +206,7 @@ Constraints:
 - Use ONLY: built-in Python, `math`, `statistics`, and `np` (numpy).
 - Do NOT import anything else.
 - Output ONLY the raw Python code – no markdown fences, no explanation.
-- Keep the script under 100 lines to stay within output token limits.
+- Keep the script under 100 lines.
 """
 
 _CODE_GEN_USER = """\
@@ -214,23 +240,16 @@ def _strip_fences(code: str) -> str:
 
 
 async def python_interpreter_node(state: AnalysisState) -> dict:
-    """
-    LLM code generation + sandboxed execution.
-    Uses gemini-2.5-flash (1 500 RPD free tier).
-    Retries on 503 via _invoke_with_retry before falling back to error state.
-    """
     if state.get("status") == "failed":
         return state
 
-    # gemini-2.5-flash: sufficient for code gen, generous free quota
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
         temperature=0.0,
         google_api_key=api_key,
-        max_output_tokens=2048,  # keep within free-tier output limits
+        max_output_tokens=2048,
     )
 
-    # ── Step 1: code generation (with retry) ──
     user_msg = _CODE_GEN_USER.format(text=state["raw_text"][:5_000])
     try:
         content = await _invoke_with_retry(llm, [
@@ -241,15 +260,12 @@ async def python_interpreter_node(state: AnalysisState) -> dict:
         return {
             "python_code":         "",
             "calculation_results": f"Code generation failed: {exc}",
-            "status":              "calculations_done",  # non-fatal — auditor continues
+            "status":              "calculations_done",
         }
 
-    code = _strip_fences(content)
-
-    # ── Step 2: first execution attempt ──
+    code   = _strip_fences(content)
     result = safe_python_executor(code)
 
-    # ── Step 3: one self-correction attempt on failure ──
     if not result["success"]:
         try:
             fix_content = await _invoke_with_retry(llm, [
@@ -268,8 +284,7 @@ async def python_interpreter_node(state: AnalysisState) -> dict:
     else:
         calc_output = (
             f"Calculation failed after self-correction attempt.\n"
-            f"Error: {result['error']}\n"
-            f"Partial output: {result['output']}"
+            f"Error: {result['error']}\nPartial output: {result['output']}"
         )
 
     return {
@@ -280,14 +295,15 @@ async def python_interpreter_node(state: AnalysisState) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Node 3 – Auditor  (gap analysis)
+# Node 3 – Auditor
 # ──────────────────────────────────────────────────────────────────────────────
 _AUDITOR_SYSTEM = """\
 You are a Senior Partner-level Chartered Accountant conducting a formal financial audit.
 You have:
-  (A) Compliance rules and regulatory requirements from the knowledge graph.
-  (B) Computed financial metrics from the Python analysis tool.
-  (C) The original document content.
+  (A) Compliance rules from the pre-defined regulatory knowledge base.
+  (B) Document-specific entities and data from the knowledge graph.
+  (C) Computed financial metrics from the Python analysis tool.
+  (D) The original document content.
 
 Produce a structured gap analysis with these mandatory sections:
 
@@ -308,7 +324,7 @@ Ratios outside normal ranges, unexplained variances, or suspicious trends.
 Areas of full compliance, robust controls, or noteworthy best practices.
 
 Be concise but specific. Cite numbers. Reference the applicable rule for every point.
-Keep total output under 1500 words to stay within free-tier token limits.
+Keep total output under 1500 words.
 """
 
 _AUDITOR_USER = """\
@@ -324,16 +340,10 @@ DOCUMENT CONTENT (first 6 000 characters):
 
 
 async def auditor_node(state: AnalysisState) -> dict:
-    """
-    Gap analysis combining retrieved rules, computed metrics, and raw text.
-    Uses gemini-2.5-flash to preserve the 25 RPD gemini-2.5-pro free quota
-    for the report generation stage where deeper reasoning matters most.
-    """
     if state.get("status") == "failed":
         return state
 
-    # FIX: was gemini-2.5-pro (25 RPD free limit — exhausted quickly).
-    # gemini-2.5-flash handles gap analysis well within free tier.
+    # FIX: was gemini-2.5-pro which exhausted the free-tier 0-RPD quota.
     llm = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
         temperature=0.1,
@@ -342,7 +352,7 @@ async def auditor_node(state: AnalysisState) -> dict:
     )
 
     user_msg = _AUDITOR_USER.format(
-        rules=state["compliance_rules"][:3_000],
+        rules=state["compliance_rules"][:4_000],
         calculations=state["calculation_results"],
         text=state["raw_text"][:6_000],
     )
