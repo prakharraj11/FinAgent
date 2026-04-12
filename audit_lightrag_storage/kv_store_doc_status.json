@@ -1,0 +1,27 @@
+{
+  "doc-b2043ed99ad84584a6b386f49aaa5f5e": {
+    "status": "failed",
+    "error_msg": "Error embedding content: module aiohttp has no attribute ClientConnectorDNSError",
+    "chunks_count": 8,
+    "chunks_list": [
+      "chunk-accb813e11ae9838e326bb9e9544331a",
+      "chunk-bf2920640f05240a488ef43988ae17de",
+      "chunk-ff5e04b1606f63b38f1068052e47ca17",
+      "chunk-79f6d5a30230f8c9601e599d17f7c179",
+      "chunk-b6dcf97d41632a7143975267307817f1",
+      "chunk-91631d6e5e2100c536cdfb831229d745",
+      "chunk-d31ac5b3caf20604fe60737a25042f33",
+      "chunk-3b1c060727d3ce596c2b88fa1d17702a"
+    ],
+    "content_summary": "Radiometer calibration using \nmachine learning\nS. A. K. Leeney1,2,16, H. T. J. Bevins1,2,16, E. de Lera Acedo1,2,16, W. J. Handley2,3,16, \nC. Kirkham1,2,16, R. S. Patel1,2,16, J. Zhu1,2,4,16,19, D. Molnar1,2,16, J. Cumner1,2,16, \nD. Anstey1,2,16, K....",
+    "content_length": 40000,
+    "created_at": "2026-04-09T11:55:23.394353+00:00",
+    "updated_at": "2026-04-09T11:55:26.285399+00:00",
+    "file_path": "unknown_source",
+    "track_id": "insert_20260409_172523_48562c20",
+    "metadata": {
+      "processing_start_time": 1775735723,
+      "processing_end_time": 1775735726
+    }
+  }
+}
