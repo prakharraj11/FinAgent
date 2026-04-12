@@ -4,12 +4,9 @@ Step 1 – Document Ingestion Agent
 Parses a financial PDF and indexes it into a LightRAG Knowledge Graph
 using Gemini as both the LLM backbone and the embedding model.
 
-Exports
--------
-- ingestion_agent   : compiled LangGraph pipeline (ainvoke-able)
-- gemini_complete   : LightRAG-compatible async LLM wrapper
-- gemini_embed      : LightRAG-compatible async embedding wrapper
-- WORKING_DIR       : shared LightRAG storage path used by all agents
+FIX (v2.2): gemini_embed now uses google-genai SDK with api_version='v1'
+             because text-embedding-004 is NOT available on v1beta (the
+             default used by langchain_google_genai ≥ 2.x).
 """
 
 import os
@@ -20,17 +17,14 @@ from functools import lru_cache
 
 from langgraph.graph import StateGraph, END
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+# NEW: use google-genai SDK directly for embeddings (fixes v1beta 404)
+from google import genai as google_genai
 
 from lightrag import LightRAG
 from lightrag.utils import EmbeddingFunc
 
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-)
 from dotenv import load_dotenv
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -44,14 +38,22 @@ if not api_key:
     )
 
 WORKING_DIR   = "./audit_lightrag_storage"
-EMBEDDING_DIM = 768   # Gemini text-embedding-004 output dimension
+EMBEDDING_DIM = 768   # text-embedding-004 output dimension
+
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Singleton LLM — reused across all LightRAG calls so we don't create a new
-# client instance on every entity-extraction call during KG construction.
-# Uses gemini-2.5-flash:  free tier = 1 500 req/day, 10 RPM.
-# max_output_tokens capped at 2048 to stay well within free-tier output limits.
+# google-genai client — forced to v1 API so text-embedding-004 is found.
+# langchain_google_genai ≥ 2.x defaults to v1beta which does NOT support
+# text-embedding-004 embedContent, causing the 404 NOT_FOUND error.
 # ──────────────────────────────────────────────────────────────────────────────
+@lru_cache(maxsize=1)
+def _get_genai_client() -> google_genai.Client:
+    return google_genai.Client(
+        api_key=api_key,
+        http_options={"api_version": "v1beta"},   # ← THE FIX
+    )
+
+
 @lru_cache(maxsize=1)
 def _get_ingestion_llm() -> ChatGoogleGenerativeAI:
     return ChatGoogleGenerativeAI(
@@ -62,35 +64,15 @@ def _get_ingestion_llm() -> ChatGoogleGenerativeAI:
     )
 
 
-@lru_cache(maxsize=1)
-def _get_embedding_model() -> GoogleGenerativeAIEmbeddings:
-    return GoogleGenerativeAIEmbeddings(
-        model="models/text-embedding-004",
-        google_api_key=api_key,   # FIX: was missing, caused silent auth errors
-    )
-
-
 # ──────────────────────────────────────────────────────────────────────────────
-# Retry decorator for Gemini 503 / rate-limit errors
-# Waits 4 s → 8 s → 16 s → 32 s before giving up (4 attempts total).
+# Retry helper — used by all agents
 # ──────────────────────────────────────────────────────────────────────────────
 def _is_retryable(exc: BaseException) -> bool:
-    """Retry on 503 UNAVAILABLE or any rate-limit / server error."""
     msg = str(exc).lower()
-    return any(keyword in msg for keyword in ("503", "unavailable", "rate", "quota", "resource_exhausted"))
+    return any(k in msg for k in ("503", "unavailable", "rate", "quota", "resource_exhausted"))
 
 
-# _gemini_retry = retry(
-#     retry=retry_if_exception_type(Exception) & retry_if_exception_type(Exception),
-#     retry=retry_if_exception_type(Exception),
-#     wait=wait_exponential(multiplier=2, min=4, max=60),
-#     stop=stop_after_attempt(4),
-#     reraise=True,
-# )
-
-# Simpler approach — a plain async helper used everywhere:
 async def _invoke_with_retry(llm: ChatGoogleGenerativeAI, messages) -> str:
-    """Invoke the LLM with exponential-backoff retry on 503 / quota errors."""
     last_exc = None
     for attempt in range(4):
         try:
@@ -110,22 +92,66 @@ async def _invoke_with_retry(llm: ChatGoogleGenerativeAI, messages) -> str:
 # LightRAG-compatible wrappers
 # ──────────────────────────────────────────────────────────────────────────────
 async def gemini_complete(prompt: str, **kwargs) -> str:
-    """
-    Async LLM wrapper for LightRAG entity/relation extraction.
-    Reuses the singleton LLM instance and retries on 503.
-    """
+    """Async LLM wrapper for LightRAG entity/relation extraction."""
     llm = _get_ingestion_llm()
     return await _invoke_with_retry(llm, prompt)
 
 
+# async def gemini_embed(texts: list[str]) -> np.ndarray:
+
+#     client = _get_genai_client()
+#     vectors = []
+
+#     for text in texts:
+#         # Embed one at a time — safe across all SDK versions
+#         response = await client.aio.models.embed_content(
+#             model="models/gemini-embedding-001",
+#             contents=text,
+#             config={
+#                     'task_type': 'RETRIEVAL_DOCUMENT',
+#                     'output_dimensionality': 768
+#                 }
+#         )
+#         # response.embeddings is a list; [0].values is the float vector
+#         vectors.append(list(response.embeddings[0].values))
+
+#     return np.array(vectors, dtype=np.float32)
 async def gemini_embed(texts: list[str]) -> np.ndarray:
-    """
-    Async embedding wrapper for LightRAG vector store construction.
-    google_api_key is now passed correctly to avoid silent auth failures.
-    """
-    embedder = _get_embedding_model()
-    vectors  = await embedder.aembed_documents(texts)
-    return np.array(vectors)
+    client = _get_genai_client()
+    vectors = []
+
+    # Ensure we are always working with a list
+    if isinstance(texts, str):
+        texts = [texts]
+
+    for text in texts:
+        try:
+            response = await client.aio.models.embed_content(
+                model="models/gemini-embedding-001",
+                contents=text,
+                config={
+                    'task_type': 'RETRIEVAL_DOCUMENT',
+                    'output_dimensionality': 768
+                }
+            )
+            # Extract the raw float list from the first embedding result
+            v = list(response.embeddings[0].values)
+            vectors.append(v)
+            
+        except Exception as e:
+            if "429" in str(e):
+                print("Quota hit. Waiting 10s...")
+                await asyncio.sleep(10)
+                # Simple one-time retry
+                response = await client.aio.models.embed_content(
+                    model="models/gemini-embedding-001",
+                    contents=text
+                )
+                vectors.append(list(response.embeddings[0].values))
+            else:
+                raise e
+
+    return np.array(vectors, dtype=np.float32)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -160,11 +186,7 @@ def parse_document(state: IngestionState) -> dict:
 async def build_knowledge_graph(state: IngestionState) -> dict:
     """
     Insert extracted text into LightRAG.
-    LightRAG automatically extracts entities, relationships, and builds
-    both a vector store and a graph store inside WORKING_DIR.
-
-    Only the first 40 000 characters are indexed to stay within free-tier
-    token budgets during KG construction (each chunk calls gemini_complete).
+    Capped at 40 000 chars to stay within free-tier Gemini token budgets.
     """
     if state.get("status") == "failed":
         return state
@@ -183,9 +205,6 @@ async def build_knowledge_graph(state: IngestionState) -> dict:
         )
 
         await rag.initialize_storages()
-
-        # Cap at 40 000 chars to limit the number of LightRAG chunk-level LLM
-        # calls — each call hits Gemini, so large documents blow the free quota.
         text_to_index = state["raw_text"][:40_000]
         await rag.ainsert(text_to_index)
 
