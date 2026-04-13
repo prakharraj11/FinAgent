@@ -29,3 +29,4 @@ pytesseract==0.3.13
 python-dotenv==1.0.1
 tenacity==9.0.0
 numpy==1.26.4
+openai
