@@ -1,844 +1,900 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>FinAudit AI — Autonomous Financial Audit Framework</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>AuditAI — Autonomous Financial Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;1,300&family=JetBrains+Mono:wght@400;500&family=Mulish:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <style>
-  :root {
-    --blue:    #1a56db;
-    --blue-lt: #e8f0fe;
-    --blue-dk: #1341b5;
-    --green:   #057a55;
-    --green-lt:#def7ec;
-    --red:     #c81e1e;
-    --red-lt:  #fde8e8;
-    --amber:   #b45309;
-    --amber-lt:#fef3c7;
-    --gray-50: #f9fafb;
-    --gray-100:#f3f4f6;
-    --gray-200:#e5e7eb;
-    --gray-400:#9ca3af;
-    --gray-600:#4b5563;
-    --gray-800:#1f2937;
-    --shadow:  0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
-    --shadow-md:0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
-  }
+/* ── Reset + Variables ─────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:          #0b0f1a;
+  --surface:     #111827;
+  --surface2:    #1a2235;
+  --border:      #1f2d45;
+  --border2:     #2a3a55;
+  --text:        #e2eaf7;
+  --muted:       #7a8ba6;
+  --accent:      #38bdf8;    /* sky blue — agent */
+  --accent-dim:  #0c2a3e;
+  --gold:        #f0c040;    /* amber — headings/brand */
+  --green:       #34d399;    /* compliant */
+  --red:         #f87171;    /* high severity */
+  --orange:      #fb923c;    /* medium */
+  --yellow:      #facc15;    /* low */
+  --font-body:   'Mulish', sans-serif;
+  --font-display:'Fraunces', serif;
+  --font-mono:   'JetBrains Mono', monospace;
+  --radius:      10px;
+  --sidebar-w:   280px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-body)}
+a{color:var(--accent);text-decoration:none}
+button{cursor:pointer;font-family:var(--font-body)}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.app{display:flex;height:100vh;overflow:hidden}
 
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    font-size: 15px;
-    color: var(--gray-800);
-    background: var(--gray-50);
-    min-height: 100vh;
-  }
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+.sidebar{
+  width:var(--sidebar-w);flex-shrink:0;
+  background:var(--surface);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+}
+.sidebar-logo{
+  padding:20px 20px 16px;
+  border-bottom:1px solid var(--border);
+}
+.logo-wordmark{
+  font-family:var(--font-display);font-size:22px;font-weight:600;
+  color:var(--gold);letter-spacing:-0.5px;
+}
+.logo-sub{
+  font-size:10px;font-weight:500;letter-spacing:2px;text-transform:uppercase;
+  color:var(--muted);margin-top:2px;
+}
+.sidebar-section{padding:14px 16px 8px;font-size:10px;letter-spacing:1.5px;
+  text-transform:uppercase;color:var(--muted);font-weight:600}
+.sidebar-sessions{flex:1;overflow-y:auto;padding:0 8px 8px}
+.session-item{
+  padding:10px 12px;border-radius:var(--radius);cursor:pointer;
+  margin-bottom:2px;transition:background .15s;
+}
+.session-item:hover{background:var(--surface2)}
+.session-item.active{background:var(--accent-dim);border:1px solid var(--accent)30}
+.session-name{font-size:12px;font-weight:600;color:var(--text);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.session-meta{font-size:11px;color:var(--muted);margin-top:2px}
+.stage-pill{
+  display:inline-flex;align-items:center;gap:4px;
+  font-size:9px;letter-spacing:.8px;text-transform:uppercase;font-weight:700;
+  padding:2px 7px;border-radius:20px;margin-top:4px;
+}
+.stage-created  {background:#1a1a2e;color:#7c88a0}
+.stage-ingested {background:#0c2a3e;color:var(--accent)}
+.stage-analyzed {background:#0a2e20;color:var(--green)}
+.stage-done     {background:#1a2800;color:var(--yellow)}
+.stage-error    {background:#2e0a0a;color:var(--red)}
+.stage-analyzing,.stage-reporting,.stage-ingesting{background:#1e1a2e;color:#a78bfa}
 
-  /* ── Header ── */
-  header {
-    background: #fff;
-    border-bottom: 1px solid var(--gray-200);
-    padding: 0 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 60px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    box-shadow: var(--shadow);
-  }
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: .6rem;
-    font-weight: 700;
-    font-size: 1.1rem;
-    color: var(--blue);
-  }
-  .logo svg { width: 28px; height: 28px; }
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    font-size: .85rem;
-  }
-  .status-pill {
-    display: flex;
-    align-items: center;
-    gap: .35rem;
-    background: var(--gray-100);
-    border-radius: 999px;
-    padding: .25rem .7rem;
-    font-size: .8rem;
-    color: var(--gray-600);
-  }
-  .dot { width: 8px; height: 8px; border-radius: 50%; }
-  .dot.green { background: #10b981; }
-  .dot.red   { background: #ef4444; }
-  .dot.gray  { background: var(--gray-400); }
+.sidebar-new-btn{
+  margin:12px;padding:10px;border-radius:var(--radius);
+  background:var(--accent-dim);border:1px solid var(--accent)40;
+  color:var(--accent);font-size:13px;font-weight:600;
+  transition:all .2s;
+}
+.sidebar-new-btn:hover{background:var(--accent);color:#000}
+.sidebar-status{
+  margin:8px 12px 12px;padding:10px 12px;border-radius:var(--radius);
+  background:var(--surface2);border:1px solid var(--border);font-size:11px;
+}
+.status-row{display:flex;justify-content:space-between;margin-bottom:3px}
+.status-label{color:var(--muted)}
+.status-val{color:var(--text);font-family:var(--font-mono);font-size:10px}
+.status-ok{color:var(--green)}
+.status-warn{color:var(--orange)}
 
-  /* ── Layout ── */
-  main {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem 4rem;
-    display: grid;
-    grid-template-columns: 340px 1fr;
-    gap: 1.5rem;
-    align-items: start;
-  }
+/* ── Main chat area ─────────────────────────────────────────────────────── */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
 
-  /* ── Cards ── */
-  .card {
-    background: #fff;
-    border: 1px solid var(--gray-200);
-    border-radius: 10px;
-    box-shadow: var(--shadow);
-    overflow: hidden;
-  }
-  .card-header {
-    padding: .9rem 1.2rem;
-    border-bottom: 1px solid var(--gray-200);
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-  }
-  .card-header h2 {
-    font-size: .95rem;
-    font-weight: 600;
-  }
-  .badge {
-    font-size: .7rem;
-    font-weight: 600;
-    padding: .15rem .5rem;
-    border-radius: 999px;
-    background: var(--blue-lt);
-    color: var(--blue);
-  }
-  .card-body { padding: 1.2rem; }
+.chat-header{
+  padding:16px 24px;border-bottom:1px solid var(--border);
+  background:var(--surface);display:flex;align-items:center;gap:12px;
+}
+.chat-header-title{font-family:var(--font-display);font-size:18px;font-weight:600;
+  color:var(--text);letter-spacing:-0.3px}
+.chat-header-sub{font-size:12px;color:var(--muted);margin-top:1px}
+.header-session-badge{
+  margin-left:auto;font-family:var(--font-mono);font-size:11px;
+  color:var(--muted);background:var(--surface2);
+  padding:4px 10px;border-radius:20px;border:1px solid var(--border);
+}
 
-  /* ── Steps sidebar ── */
-  .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+.chat-messages{
+  flex:1;overflow-y:auto;padding:24px;
+  display:flex;flex-direction:column;gap:16px;
+}
 
-  .step-number {
-    width: 26px; height: 26px;
-    border-radius: 50%;
-    background: var(--blue);
-    color: #fff;
-    font-size: .75rem;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-  }
-  .step-number.done { background: var(--green); }
-  .step-number.gray { background: var(--gray-400); }
+/* ── Welcome screen ─────────────────────────────────────────────────────── */
+.welcome{
+  margin:auto;text-align:center;max-width:440px;
+  animation:fadeUp .5s ease both;
+}
+.welcome-icon{font-size:48px;margin-bottom:16px}
+.welcome-title{
+  font-family:var(--font-display);font-size:28px;font-weight:600;
+  color:var(--gold);letter-spacing:-1px;margin-bottom:8px;
+}
+.welcome-sub{font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:28px}
+.welcome-upload-zone{
+  border:2px dashed var(--border2);border-radius:16px;
+  padding:32px 24px;cursor:pointer;transition:all .2s;
+  background:var(--surface);
+}
+.welcome-upload-zone:hover,.welcome-upload-zone.drag-over{
+  border-color:var(--accent);background:var(--accent-dim);
+}
+.upload-icon{font-size:32px;margin-bottom:8px}
+.upload-label{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
+.upload-hint{font-size:12px;color:var(--muted)}
+#welcome-file-input{display:none}
 
-  /* ── Forms ── */
-  label {
-    display: block;
-    font-size: .8rem;
-    font-weight: 600;
-    color: var(--gray-600);
-    margin-bottom: .35rem;
-  }
-  .upload-zone {
-    border: 2px dashed var(--gray-200);
-    border-radius: 8px;
-    padding: 1.5rem 1rem;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color .2s, background .2s;
-  }
-  .upload-zone:hover, .upload-zone.drag-over {
-    border-color: var(--blue);
-    background: var(--blue-lt);
-  }
-  .upload-zone input { display: none; }
-  .upload-zone p { font-size: .8rem; color: var(--gray-400); margin-top: .4rem; }
-  .upload-zone .file-name {
-    font-size: .85rem;
-    color: var(--blue);
-    font-weight: 600;
-    margin-top: .3rem;
-  }
+/* ── Chat bubbles ───────────────────────────────────────────────────────── */
+.message{display:flex;gap:12px;animation:fadeUp .3s ease both}
+.message.user{flex-direction:row-reverse}
 
-  .checkbox-row {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    margin-top: .75rem;
-    padding: .6rem .8rem;
-    background: var(--amber-lt);
-    border-radius: 6px;
-    border: 1px solid #fcd34d;
-  }
-  .checkbox-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--blue); }
-  .checkbox-row label {
-    margin: 0;
-    font-size: .8rem;
-    color: var(--amber);
-    cursor: pointer;
-  }
+.avatar{
+  width:34px;height:34px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;
+}
+.avatar.agent{background:var(--accent-dim);border:1px solid var(--accent)40}
+.avatar.user-av{background:var(--surface2);border:1px solid var(--border2)}
 
-  input[type=text], input[type=url] {
-    width: 100%;
-    padding: .45rem .7rem;
-    border: 1px solid var(--gray-200);
-    border-radius: 6px;
-    font-size: .85rem;
-    color: var(--gray-800);
-    outline: none;
-    transition: border-color .2s;
-  }
-  input[type=text]:focus, input[type=url]:focus { border-color: var(--blue); }
+.bubble{
+  max-width:72%;padding:12px 16px;border-radius:16px;
+  font-size:14px;line-height:1.65;
+}
+.bubble.agent{
+  background:var(--surface);border:1px solid var(--border);
+  border-top-left-radius:4px;
+}
+.bubble.user{
+  background:var(--accent-dim);border:1px solid var(--accent)30;
+  color:var(--text);border-top-right-radius:4px;
+  text-align:right;
+}
 
-  /* ── Buttons ── */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: .4rem;
-    font-size: .85rem;
-    font-weight: 600;
-    padding: .55rem 1.1rem;
-    border-radius: 7px;
-    border: none;
-    cursor: pointer;
-    transition: background .15s, transform .1s;
-    text-decoration: none;
-  }
-  .btn:active { transform: scale(.98); }
-  .btn-primary { background: var(--blue); color: #fff; }
-  .btn-primary:hover { background: var(--blue-dk); }
-  .btn-primary:disabled { background: var(--gray-400); cursor: not-allowed; }
-  .btn-outline {
-    background: #fff;
-    color: var(--gray-800);
-    border: 1px solid var(--gray-200);
-  }
-  .btn-outline:hover { background: var(--gray-100); }
-  .btn-danger { background: var(--red); color: #fff; }
-  .btn-full { width: 100%; }
+/* ── Progress steps ─────────────────────────────────────────────────────── */
+.progress-msg{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;border-radius:10px;
+  background:var(--surface2);border:1px solid var(--border);
+  font-size:13px;color:var(--muted);
+  animation:fadeUp .25s ease both;
+}
+.progress-spinner{
+  width:16px;height:16px;border:2px solid var(--border2);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:spin .8s linear infinite;flex-shrink:0;
+}
+.progress-check{width:16px;height:16px;flex-shrink:0;color:var(--green);font-size:14px}
 
-  /* ── Progress / spinner ── */
-  .progress-wrap { margin-top: 1rem; }
-  .progress-bar {
-    height: 4px;
-    background: var(--gray-200);
-    border-radius: 4px;
-    overflow: hidden;
-  }
-  .progress-fill {
-    height: 100%;
-    background: var(--blue);
-    border-radius: 4px;
-    transition: width .4s;
-    width: 0%;
-  }
-  .progress-label {
-    font-size: .75rem;
-    color: var(--gray-600);
-    margin-top: .4rem;
-  }
-  .spinner {
-    width: 18px; height: 18px;
-    border: 2px solid rgba(255,255,255,.4);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: spin .7s linear infinite;
-    display: inline-block;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* ── Thinking indicator ─────────────────────────────────────────────────── */
+.thinking{display:flex;gap:5px;padding:14px 16px;align-items:center}
+.dot{
+  width:7px;height:7px;border-radius:50%;background:var(--accent);opacity:.3;
+  animation:pulse 1.2s ease-in-out infinite;
+}
+.dot:nth-child(2){animation-delay:.2s}
+.dot:nth-child(3){animation-delay:.4s}
 
-  /* ── Alert banners ── */
-  .alert {
-    padding: .7rem .9rem;
-    border-radius: 7px;
-    font-size: .82rem;
-    display: flex;
-    align-items: flex-start;
-    gap: .5rem;
-    margin-top: .75rem;
-  }
-  .alert-error  { background: var(--red-lt);   color: var(--red);   border: 1px solid #fca5a5; }
-  .alert-success{ background: var(--green-lt); color: var(--green); border: 1px solid #6ee7b7; }
-  .alert-info   { background: var(--blue-lt);  color: var(--blue);  border: 1px solid #93c5fd; }
-  .alert-warn   { background: var(--amber-lt); color: var(--amber); border: 1px solid #fcd34d; }
+/* ── Action card (confirmation) ─────────────────────────────────────────── */
+.action-card{
+  max-width:72%;padding:16px;border-radius:16px;
+  background:var(--surface);border:1px solid var(--border2);
+  border-top-left-radius:4px;
+  animation:fadeUp .35s ease both;
+}
+.action-card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
+.action-card-sub{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6}
+.action-btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn-primary{
+  padding:9px 20px;border-radius:8px;border:none;font-size:13px;font-weight:700;
+  background:var(--accent);color:#000;letter-spacing:.3px;
+  transition:all .15s;
+}
+.btn-primary:hover{background:#7dd3fc;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-secondary{
+  padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;
+  background:transparent;border:1px solid var(--border2);color:var(--muted);
+  transition:all .15s;
+}
+.btn-secondary:hover{border-color:var(--text);color:var(--text)}
 
-  /* ── Report output panel ── */
-  #report-panel { grid-column: 2; }
+/* ── Findings preview card ─────────────────────────────────────────────── */
+.findings-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:12px;overflow:hidden;margin-top:10px;
+}
+.findings-header{
+  padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);cursor:pointer;
+}
+.findings-header-left{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600}
+.severity-chips{display:flex;gap:6px}
+.chip{
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
+  letter-spacing:.5px;text-transform:uppercase;
+}
+.chip-high  {background:#2e0a0a;color:var(--red)}
+.chip-medium{background:#1e1200;color:var(--orange)}
+.chip-low   {background:#1a1800;color:var(--yellow)}
+.findings-body{
+  padding:14px 16px;font-size:12px;color:var(--muted);
+  font-family:var(--font-mono);line-height:1.7;max-height:200px;overflow-y:auto;
+  white-space:pre-wrap;word-break:break-word;
+}
+.findings-toggle{font-size:11px;color:var(--accent);font-weight:600}
 
-  .tabs {
-    display: flex;
-    border-bottom: 1px solid var(--gray-200);
-    gap: 0;
-    background: var(--gray-50);
-  }
-  .tab {
-    padding: .6rem 1rem;
-    font-size: .82rem;
-    font-weight: 600;
-    color: var(--gray-600);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    white-space: nowrap;
-  }
-  .tab:hover { color: var(--blue); }
-  .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+/* ── Report card ────────────────────────────────────────────────────────── */
+.report-card{
+  max-width:90%;background:var(--surface);border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;animation:fadeUp .4s ease both;
+}
+.report-card-header{
+  padding:14px 20px;background:var(--surface2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.report-card-title{font-family:var(--font-display);font-size:16px;color:var(--gold)}
+.report-card-meta{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
+.report-actions{display:flex;gap:8px}
+.btn-icon{
+  padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;
+  background:var(--surface);border:1px solid var(--border2);color:var(--muted);
+  transition:all .15s;
+}
+.btn-icon:hover{border-color:var(--accent);color:var(--accent)}
+.report-body{
+  padding:20px 24px;max-height:520px;overflow-y:auto;
+  font-size:13px;line-height:1.8;color:var(--text);
+}
+/* Markdown inside report */
+.report-body h1{font-family:var(--font-display);font-size:20px;color:var(--gold);
+  margin:20px 0 8px;font-weight:600}
+.report-body h2{font-family:var(--font-display);font-size:16px;color:var(--accent);
+  margin:18px 0 6px;font-weight:400;letter-spacing:.3px}
+.report-body h3{font-size:13px;font-weight:700;color:var(--text);margin:12px 0 4px}
+.report-body p{margin-bottom:10px;color:var(--muted)}
+.report-body strong{color:var(--text);font-weight:600}
+.report-body table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}
+.report-body th{background:var(--surface2);padding:8px 10px;text-align:left;
+  border-bottom:1px solid var(--border2);color:var(--muted);font-weight:600;
+  font-size:10px;text-transform:uppercase;letter-spacing:1px}
+.report-body td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text)}
+.report-body tr:last-child td{border:none}
+.report-body code{font-family:var(--font-mono);background:var(--surface2);
+  padding:1px 5px;border-radius:4px;font-size:11px;color:var(--green)}
+.report-body pre{background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:14px;overflow-x:auto;margin:12px 0}
+.report-body pre code{background:none;padding:0;font-size:11px}
+.report-body hr{border:none;border-top:1px solid var(--border);margin:16px 0}
+.report-body blockquote{border-left:3px solid var(--accent);padding-left:12px;
+  color:var(--muted);font-style:italic;margin:10px 0}
+.report-body ul,
+.report-body ol{padding-left:20px;margin-bottom:10px;color:var(--muted)}
+.report-body li{margin-bottom:4px}
 
-  .tab-content { display: none; padding: 1.2rem; }
-  .tab-content.active { display: block; }
+/* ── Upload bar (bottom) ─────────────────────────────────────────────────── */
+.chat-input-area{
+  padding:14px 20px;border-top:1px solid var(--border);
+  background:var(--surface);
+}
+.upload-bar{
+  display:flex;align-items:center;gap:10px;
+  background:var(--surface2);border:1px solid var(--border2);
+  border-radius:12px;padding:8px 12px;cursor:pointer;transition:border-color .2s;
+}
+.upload-bar:hover{border-color:var(--accent)}
+.upload-bar-icon{font-size:18px}
+.upload-bar-text{font-size:13px;color:var(--muted);flex:1}
+.upload-bar-text span{color:var(--accent);font-weight:600}
+#main-file-input{display:none}
+.api-url-row{
+  display:flex;align-items:center;gap:8px;margin-top:8px;
+}
+.api-url-input{
+  flex:1;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:6px 10px;font-family:var(--font-mono);
+  font-size:11px;color:var(--muted);outline:none;
+}
+.api-url-input:focus{border-color:var(--accent);color:var(--text)}
+.api-url-label{font-size:11px;color:var(--muted);white-space:nowrap}
 
-  /* ── Markdown report rendering ── */
-  .report-md h1 { font-size: 1.2rem; margin-bottom: .5rem; color: var(--blue-dk); }
-  .report-md h2 { font-size: 1rem; margin: 1rem 0 .35rem; border-bottom: 1px solid var(--gray-200); padding-bottom: .2rem; }
-  .report-md h3 { font-size: .9rem; margin: .75rem 0 .25rem; color: var(--gray-800); }
-  .report-md p  { margin-bottom: .5rem; line-height: 1.6; font-size: .85rem; }
-  .report-md ul, .report-md ol { padding-left: 1.2rem; margin-bottom: .5rem; }
-  .report-md li { font-size: .85rem; line-height: 1.6; }
-  .report-md table { width: 100%; border-collapse: collapse; margin: .75rem 0; font-size: .82rem; }
-  .report-md th { background: var(--gray-100); font-weight: 600; }
-  .report-md th, .report-md td { border: 1px solid var(--gray-200); padding: .4rem .6rem; text-align: left; }
-  .report-md code { background: var(--gray-100); padding: .1rem .3rem; border-radius: 3px; font-size: .8rem; }
-  .report-md pre  { background: var(--gray-800); color: #e5e7eb; padding: .8rem; border-radius: 6px; overflow-x: auto; font-size: .78rem; margin: .5rem 0; }
-  .report-md pre code { background: none; color: inherit; padding: 0; }
-  .report-md strong { font-weight: 600; }
-  .report-md hr { border: none; border-top: 1px solid var(--gray-200); margin: 1rem 0; }
+/* ── Animations ──────────────────────────────────────────────────────────── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
 
-  /* ── CARO clause grid ── */
-  .clause-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: .5rem;
-    margin-top: .5rem;
-  }
-  .clause-card {
-    border: 1px solid var(--gray-200);
-    border-radius: 6px;
-    padding: .5rem .7rem;
-    font-size: .78rem;
-    display: flex;
-    align-items: flex-start;
-    gap: .4rem;
-  }
-  .clause-num {
-    font-weight: 700;
-    color: var(--blue);
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-  .clause-title { color: var(--gray-600); line-height: 1.3; }
-
-  /* ── Opinion badge ── */
-  .opinion-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    font-size: .9rem;
-    font-weight: 700;
-    padding: .4rem .9rem;
-    border-radius: 6px;
-    margin-bottom: .75rem;
-  }
-  .opinion-unqualified { background: var(--green-lt); color: var(--green); }
-  .opinion-qualified   { background: var(--amber-lt); color: var(--amber); }
-  .opinion-adverse     { background: var(--red-lt);   color: var(--red);   }
-  .opinion-disclaimer  { background: var(--gray-100); color: var(--gray-600); }
-  .opinion-partial     { background: var(--amber-lt); color: var(--amber); }
-
-  /* ── Reports history ── */
-  .report-list { display: flex; flex-direction: column; gap: .4rem; }
-  .report-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: .5rem .7rem;
-    border: 1px solid var(--gray-200);
-    border-radius: 6px;
-    font-size: .82rem;
-    cursor: pointer;
-    transition: background .15s;
-  }
-  .report-item:hover { background: var(--blue-lt); border-color: var(--blue); }
-  .report-item .rid { font-weight: 600; color: var(--blue); font-family: monospace; }
-
-  /* ── Divider ── */
-  .divider { border: none; border-top: 1px solid var(--gray-200); margin: 1rem 0; }
-
-  /* ── Empty state ── */
-  .empty { text-align: center; padding: 2.5rem 1rem; color: var(--gray-400); }
-  .empty svg { width: 48px; height: 48px; margin: 0 auto .75rem; display: block; opacity: .4; }
-  .empty p { font-size: .85rem; }
-
-  @media (max-width: 720px) {
-    main { grid-template-columns: 1fr; }
-    #report-panel { grid-column: 1; }
-  }
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media(max-width:700px){
+  .sidebar{display:none}
+  .bubble{max-width:90%}
+  .action-card{max-width:90%}
+}
 </style>
 </head>
 <body>
+<div class="app">
 
-<header>
-  <div class="logo">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M9 17H7A5 5 0 0 1 7 7h2"/>
-      <path d="M15 7h2a5 5 0 1 1 0 10h-2"/>
-      <line x1="8" y1="12" x2="16" y2="12"/>
-    </svg>
-    FinAudit AI
+  <!-- ── Sidebar ─────────────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-wordmark">AuditAI</div>
+      <div class="logo-sub">Autonomous Financial Audit</div>
+    </div>
+
+    <button class="sidebar-new-btn" onclick="startNewSession()">＋ New Audit Session</button>
+
+    <div class="sidebar-status" id="sidebar-status">
+      <div class="status-row">
+        <span class="status-label">API</span>
+        <span class="status-val" id="api-status">—</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Rules KB</span>
+        <span class="status-val" id="rules-status">—</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">Recent Sessions</div>
+    <div class="sidebar-sessions" id="session-list">
+      <div style="padding:12px;font-size:12px;color:var(--muted)">No sessions yet</div>
+    </div>
+  </aside>
+
+  <!-- ── Main ───────────────────────────────────────────────────── -->
+  <div class="main">
+    <header class="chat-header">
+      <div>
+        <div class="chat-header-title">Financial Audit Assistant</div>
+        <div class="chat-header-sub" id="header-sub">Upload a financial PDF to begin</div>
+      </div>
+      <div class="header-session-badge" id="header-session-id" style="display:none"></div>
+    </header>
+
+    <div class="chat-messages" id="chat-messages">
+      <!-- Welcome -->
+      <div class="welcome" id="welcome-screen">
+        <div class="welcome-icon">📊</div>
+        <div class="welcome-title">Audit any financial statement</div>
+        <div class="welcome-sub">
+          Upload a PDF — I'll parse it, run clause-by-clause CARO 2020 compliance analysis,
+          compute financial ratios, and generate a publishable audit report.
+          You confirm each step.
+        </div>
+        <div class="welcome-upload-zone" id="welcome-drop-zone"
+             onclick="document.getElementById('welcome-file-input').click()"
+             ondragover="onDragOver(event)" ondrop="onDrop(event,'welcome')"
+             ondragleave="onDragLeave(event)">
+          <div class="upload-icon">📎</div>
+          <div class="upload-label">Drop your financial PDF here</div>
+          <div class="upload-hint">or click to browse · PDF only</div>
+        </div>
+        <input type="file" id="welcome-file-input" accept=".pdf" onchange="onFileSelect(event,'welcome')"/>
+      </div>
+    </div>
+
+    <!-- Bottom upload bar -->
+    <div class="chat-input-area" id="bottom-bar" style="display:none">
+      <div class="upload-bar"
+           onclick="document.getElementById('main-file-input').click()"
+           ondragover="onDragOver(event)" ondrop="onDrop(event,'main')"
+           ondragleave="onDragLeave(event)">
+        <span class="upload-bar-icon">📎</span>
+        <span class="upload-bar-text">Drop a new PDF, or <span>click to upload</span> a different document</span>
+      </div>
+      <input type="file" id="main-file-input" accept=".pdf" onchange="onFileSelect(event,'main')"/>
+      <div class="api-url-row">
+        <span class="api-url-label">API</span>
+        <input class="api-url-input" id="api-url-input" value="http://localhost:8000"
+               oninput="API_BASE=this.value.replace(/\/$/,'')" placeholder="http://localhost:8000"/>
+      </div>
+    </div>
   </div>
-  <div class="header-right">
-    <div class="status-pill" id="server-status">
-      <div class="dot gray" id="server-dot"></div>
-      <span id="server-label">Connecting…</span>
-    </div>
-    <div class="status-pill" id="rules-pill">
-      <div class="dot gray" id="rules-dot"></div>
-      <span id="rules-label">Rules KB: –</span>
-    </div>
-  </div>
-</header>
-
-<main>
-  <!-- ────────── SIDEBAR ────────── -->
-  <div class="sidebar">
-
-    <!-- Step 1: Upload Rules -->
-    <div class="card">
-      <div class="card-header">
-        <div class="step-number" id="step1-num">1</div>
-        <h2>Rules Knowledge Base</h2>
-        <span class="badge">Once</span>
-      </div>
-      <div class="card-body">
-        <p style="font-size:.8rem;color:var(--gray-600);margin-bottom:.75rem">
-          Upload CARO 2020, SA standards, Income Tax Act PDFs.
-          Stored permanently — no need to re-upload.
-        </p>
-        <div class="upload-zone" id="rules-zone" onclick="document.getElementById('rules-input').click()">
-          <input type="file" id="rules-input" accept=".pdf" multiple />
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" style="margin:0 auto">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14,2 14,8 20,8"/>
-          </svg>
-          <p>Click or drop PDF files here</p>
-          <div class="file-name" id="rules-file-name"></div>
-        </div>
-        <button class="btn btn-primary btn-full" style="margin-top:.75rem" onclick="uploadRules()" id="rules-btn">
-          Upload Rules PDFs
-        </button>
-        <div id="rules-alert"></div>
-      </div>
-    </div>
-
-    <!-- Step 2: Upload & Audit -->
-    <div class="card">
-      <div class="card-header">
-        <div class="step-number" id="step2-num">2</div>
-        <h2>Audit a Document</h2>
-      </div>
-      <div class="card-body">
-        <label>Financial PDF</label>
-        <div class="upload-zone" id="audit-zone" onclick="document.getElementById('audit-input').click()">
-          <input type="file" id="audit-input" accept=".pdf" onchange="onAuditFileChange()" />
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" style="margin:0 auto">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14,2 14,8 20,8"/>
-          </svg>
-          <p>Click or drop PDF here</p>
-          <div class="file-name" id="audit-file-name"></div>
-        </div>
-
-        <div class="checkbox-row" id="skip-row" style="display:none">
-          <input type="checkbox" id="skip-check" />
-          <label for="skip-check">
-            ⚡ Skip re-ingestion — reuse cached: <strong id="cached-name">–</strong>
-          </label>
-        </div>
-
-        <div style="margin-top:1rem; display:flex; flex-direction:column; gap:.5rem">
-          <button class="btn btn-primary btn-full" onclick="runAudit('audit')" id="audit-btn" disabled>
-            Run Full Audit (Steps 1→3)
-          </button>
-          <button class="btn btn-outline btn-full" onclick="runAudit('analyze')" id="analyze-btn" disabled>
-            Analysis Only (Steps 1→2)
-          </button>
-        </div>
-
-        <div id="audit-progress" style="display:none" class="progress-wrap">
-          <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
-          <div class="progress-label" id="prog-label">Initialising…</div>
-        </div>
-
-        <div id="audit-alert"></div>
-      </div>
-    </div>
-
-    <!-- Past reports -->
-    <div class="card">
-      <div class="card-header">
-        <div class="step-number gray">↗</div>
-        <h2>Past Reports</h2>
-        <button class="btn btn-outline" style="margin-left:auto;padding:.3rem .6rem;font-size:.75rem" onclick="loadReportList()">Refresh</button>
-      </div>
-      <div class="card-body" id="report-list-body">
-        <div class="empty">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14,2 14,8 20,8"/>
-          </svg>
-          <p>No saved reports yet</p>
-        </div>
-      </div>
-    </div>
-
-  </div><!-- /sidebar -->
-
-  <!-- ────────── REPORT PANEL ────────── -->
-  <div class="card" id="report-panel">
-    <div class="card-header">
-      <div class="step-number gray">3</div>
-      <h2>Audit Report</h2>
-      <span id="report-id-badge" style="margin-left:auto;font-size:.75rem;color:var(--gray-400);font-family:monospace"></span>
-      <button class="btn btn-outline" style="margin-left:.5rem;padding:.3rem .6rem;font-size:.75rem" id="download-btn" onclick="downloadReport()" style="display:none">⬇ Save</button>
-    </div>
-
-    <!-- Tabs -->
-    <div class="tabs" id="report-tabs" style="display:none">
-      <div class="tab active" onclick="switchTab('report')">Full Report</div>
-      <div class="tab" onclick="switchTab('findings')">CARO Findings</div>
-      <div class="tab" onclick="switchTab('metrics')">Metrics</div>
-      <div class="tab" onclick="switchTab('summary')">Executive Summary</div>
-    </div>
-
-    <!-- Empty state -->
-    <div id="report-empty" class="empty" style="padding:4rem 1rem">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
-        <path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/>
-      </svg>
-      <p>Upload a financial PDF and run the audit to see the report here.</p>
-    </div>
-
-    <!-- Tab: Full Report -->
-    <div class="tab-content active" id="tab-report" style="display:none">
-      <div id="opinion-display"></div>
-      <div class="report-md" id="report-md-body"></div>
-    </div>
-
-    <!-- Tab: CARO Findings -->
-    <div class="tab-content" id="tab-findings" style="display:none">
-      <div class="report-md" id="findings-md-body"></div>
-    </div>
-
-    <!-- Tab: Metrics -->
-    <div class="tab-content" id="tab-metrics" style="display:none">
-      <pre id="metrics-body" style="font-size:.82rem;white-space:pre-wrap;font-family:monospace;color:var(--gray-800)"></pre>
-    </div>
-
-    <!-- Tab: Summary -->
-    <div class="tab-content" id="tab-summary" style="display:none">
-      <div id="opinion-display-2"></div>
-      <div class="report-md" id="summary-md-body"></div>
-    </div>
-
-  </div><!-- /report-panel -->
-</main>
+</div>
 
 <script>
-const API = 'http://localhost:8000';
-let currentReportId = null;
+// ── Config ────────────────────────────────────────────────────────────────────
+let API_BASE = 'http://localhost:8000';
+let currentSessionId = null;
+let eventSource = null;
+let analysisData = null;
+let reportId = null;
+let findingsExpanded = false;
 
-// ── Startup ──────────────────────────────────────────────────────────────────
-async function init() {
-  await checkServer();
-  await checkCache();
-  await loadReportList();
-}
+// ── Boot ───────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', async () => {
+  await fetchServerStatus();
+  await loadSessionList();
+  // Sync API URL input
+  document.getElementById('api-url-input').value = API_BASE;
+  document.getElementById('api-url-input').oninput = function() {
+    API_BASE = this.value.replace(/\/$/, '');
+  };
+});
 
-async function checkServer() {
+// ── Server health ─────────────────────────────────────────────────────────────
+async function fetchServerStatus() {
   try {
-    const r = await fetch(`${API}/`);
+    const r = await fetch(`${API_BASE}/`);
     const d = await r.json();
-    document.getElementById('server-dot').className = 'dot green';
-    document.getElementById('server-label').textContent = 'Server online';
-
-    const chunks = d.rules_kb?.chunks ?? 0;
-    document.getElementById('rules-dot').className = chunks > 0 ? 'dot green' : 'dot red';
-    document.getElementById('rules-label').textContent = `Rules KB: ${chunks} chunks`;
-    if (chunks > 0) {
-      document.getElementById('step1-num').className = 'step-number done';
-    }
+    const rulesCount = d.rules_kb?.chunks || 0;
+    document.getElementById('api-status').textContent = '● Online';
+    document.getElementById('api-status').className = 'status-val status-ok';
+    document.getElementById('rules-status').textContent =
+      rulesCount > 0 ? `${rulesCount} chunks` : 'Empty';
+    document.getElementById('rules-status').className =
+      `status-val ${rulesCount > 0 ? 'status-ok' : 'status-warn'}`;
   } catch {
-    document.getElementById('server-dot').className = 'dot red';
-    document.getElementById('server-label').textContent = 'Server offline';
+    document.getElementById('api-status').textContent = '● Offline';
+    document.getElementById('api-status').className = 'status-val status-warn';
   }
 }
 
-async function checkCache() {
+// ── Session list ──────────────────────────────────────────────────────────────
+async function loadSessionList() {
   try {
-    const r = await fetch(`${API}/last-run/`);
+    const r = await fetch(`${API_BASE}/sessions/`);
     const d = await r.json();
-    if (d.cached) {
-      document.getElementById('skip-row').style.display = 'flex';
-      document.getElementById('cached-name').textContent = d.file_name;
-    }
-  } catch {}
-}
-
-// ── Rules upload ─────────────────────────────────────────────────────────────
-document.getElementById('rules-input').onchange = function() {
-  const files = Array.from(this.files);
-  document.getElementById('rules-file-name').textContent = files.map(f => f.name).join(', ');
-};
-
-async function uploadRules() {
-  const input = document.getElementById('rules-input');
-  if (!input.files.length) return showAlert('rules-alert', 'Select at least one PDF.', 'error');
-
-  const btn = document.getElementById('rules-btn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Uploading…';
-
-  const fd = new FormData();
-  for (const f of input.files) fd.append('files', f);
-
-  try {
-    const r = await fetch(`${API}/ingest-rules/`, { method: 'POST', body: fd });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.detail || 'Upload failed');
-    showAlert('rules-alert', `✓ ${d.message}`, 'success');
-    document.getElementById('step1-num').className = 'step-number done';
-    await checkServer();
-  } catch(e) {
-    showAlert('rules-alert', `Error: ${e.message}`, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = 'Upload Rules PDFs';
-  }
-}
-
-// ── Audit file pick ───────────────────────────────────────────────────────────
-function onAuditFileChange() {
-  const input = document.getElementById('audit-input');
-  const name = input.files[0]?.name || '';
-  document.getElementById('audit-file-name').textContent = name;
-  document.getElementById('audit-btn').disabled = !name;
-  document.getElementById('analyze-btn').disabled = !name;
-}
-
-// ── Run audit ─────────────────────────────────────────────────────────────────
-const STEPS = [
-  [10,  'Step 1 — Parsing PDF…'],
-  [25,  'Step 1 — Building Knowledge Graph…'],
-  [45,  'Step 2 — Retrieving CARO 2020 rules…'],
-  [60,  'Step 2 — Running Python financial calculations…'],
-  [75,  'Step 2 — Clause-by-clause gap analysis…'],
-  [88,  'Step 3 — Generating audit report…'],
-  [95,  'Step 3 — Quality review pass…'],
-  [100, 'Complete!'],
-];
-
-async function runAudit(mode) {
-  const input = document.getElementById('audit-input');
-  const skip  = document.getElementById('skip-check').checked;
-
-  if (!input.files[0] && !skip) return showAlert('audit-alert', 'Please select a PDF file.', 'error');
-
-  setProgress(true);
-  clearAlert('audit-alert');
-  showEmptyState(false);
-
-  // Animate progress bar through stages
-  let stepIdx = 0;
-  const interval = setInterval(() => {
-    if (stepIdx < STEPS.length - 1) {
-      const [pct, label] = STEPS[stepIdx++];
-      document.getElementById('prog-fill').style.width = pct + '%';
-      document.getElementById('prog-label').textContent = label;
-    }
-  }, mode === 'audit' ? 22000 : 16000);
-
-  const fd = new FormData();
-  // Always attach the file (even dummy) — server needs the field
-  if (input.files[0]) fd.append('file', input.files[0]);
-  else fd.append('file', new Blob([''], {type:'application/pdf'}), 'reuse.pdf');
-  fd.append('skip_ingestion', skip ? 'true' : 'false');
-
-  const endpoint = mode === 'audit' ? '/audit/' : '/analyze/';
-
-  try {
-    const r = await fetch(`${API}${endpoint}`, { method: 'POST', body: fd });
-    const d = await r.json();
-    clearInterval(interval);
-
-    if (!r.ok) {
-      setProgress(false);
-      return showAlert('audit-alert', `Server error: ${d.detail || JSON.stringify(d)}`, 'error');
-    }
-
-    document.getElementById('prog-fill').style.width = '100%';
-    document.getElementById('prog-label').textContent = 'Done!';
-
-    setTimeout(() => setProgress(false), 800);
-
-    if (d.error) showAlert('audit-alert', `⚠ Partial result saved (${d.error.slice(0,120)}…)`, 'warn');
-    else         showAlert('audit-alert', `✓ Report saved — ID: ${d.report_id}`, 'success');
-
-    displayReport(d);
-    await loadReportList();
-    await checkCache();
-
-  } catch(e) {
-    clearInterval(interval);
-    setProgress(false);
-    showAlert('audit-alert', `Request failed: ${e.message}`, 'error');
-  }
-}
-
-// ── Display report ────────────────────────────────────────────────────────────
-function displayReport(d) {
-  currentReportId = d.report_id;
-  document.getElementById('report-id-badge').textContent = `#${d.report_id}`;
-  document.getElementById('report-tabs').style.display = 'flex';
-  document.getElementById('report-empty').style.display = 'none';
-  document.getElementById('tab-report').style.display = 'block';
-  document.getElementById('download-btn').style.display = '';
-
-  // Opinion badge
-  const opinion = d.audit_opinion || 'Unknown';
-  const cls = {
-    'Unqualified':'opinion-unqualified','Qualified':'opinion-qualified',
-    'Adverse':'opinion-adverse','Disclaimer':'opinion-disclaimer','partial':'opinion-partial'
-  }[opinion] || 'opinion-partial';
-  const badgeHtml = `<div class="opinion-badge ${cls}">Audit Opinion: ${opinion}</div>`;
-  document.getElementById('opinion-display').innerHTML = badgeHtml;
-  document.getElementById('opinion-display-2').innerHTML = badgeHtml;
-
-  // Full report
-  const reportText = d.final_report || d.executive_summary || '(No report content)';
-  document.getElementById('report-md-body').innerHTML = marked.parse(reportText);
-
-  // Findings
-  const findings = (d.audit_findings || []).join('\n\n---\n\n');
-  document.getElementById('findings-md-body').innerHTML = marked.parse(findings || '(No findings)');
-
-  // Metrics
-  document.getElementById('metrics-body').textContent = d.calculation_results || '(No metrics computed)';
-
-  // Summary
-  document.getElementById('summary-md-body').innerHTML = marked.parse(d.executive_summary || '(No summary)');
-
-  switchTab('report');
-}
-
-// ── Tab switching ─────────────────────────────────────────────────────────────
-function switchTab(name) {
-  document.querySelectorAll('.tab').forEach((t, i) => {
-    const names = ['report','findings','metrics','summary'];
-    t.classList.toggle('active', names[i] === name);
-  });
-  ['report','findings','metrics','summary'].forEach(n => {
-    const el = document.getElementById(`tab-${n}`);
-    if (el) {
-      el.style.display = n === name ? 'block' : 'none';
-      el.classList.toggle('active', n === name);
-    }
-  });
-}
-
-// ── Report list ───────────────────────────────────────────────────────────────
-async function loadReportList() {
-  try {
-    const r = await fetch(`${API}/reports/`);
-    const d = await r.json();
-    const body = document.getElementById('report-list-body');
-    if (!d.report_ids?.length) {
-      body.innerHTML = '<div class="empty"><p>No saved reports yet</p></div>';
+    const list = document.getElementById('session-list');
+    if (!d.sessions?.length) {
+      list.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--muted)">No sessions yet</div>';
       return;
     }
-    const list = document.createElement('div');
-    list.className = 'report-list';
-    d.report_ids.slice().reverse().forEach(id => {
-      const item = document.createElement('div');
-      item.className = 'report-item';
-      item.innerHTML = `<span class="rid">#${id}</span><span style="color:var(--gray-400);font-size:.75rem">Click to load</span>`;
-      item.onclick = () => loadSavedReport(id);
-      list.appendChild(item);
-    });
-    body.innerHTML = '';
-    body.appendChild(list);
+    list.innerHTML = d.sessions.map(s => `
+      <div class="session-item ${s.id === currentSessionId ? 'active' : ''}"
+           onclick="loadSession('${s.id}')">
+        <div class="session-name">${esc(s.file_name || 'Untitled')}</div>
+        <div class="session-meta">${relativeTime(s.created_at)}</div>
+        <span class="stage-pill stage-${s.stage}">${s.stage}</span>
+      </div>
+    `).join('');
   } catch {}
 }
 
-async function loadSavedReport(id) {
+// ── Load existing session ─────────────────────────────────────────────────────
+async function loadSession(sid) {
   try {
-    const r = await fetch(`${API}/report/${id}/full`);
-    const d = await r.json();
-    d.report_id = id;
-    displayReport(d);
-  } catch(e) {
-    showAlert('audit-alert', `Could not load report ${id}: ${e.message}`, 'error');
+    const r = await fetch(`${API_BASE}/session/${sid}/status`);
+    const session = await r.json();
+    currentSessionId = sid;
+    switchToChatView(session.file_name || 'Document');
+
+    clearChat();
+
+    // Replay state
+    if (session.stage === 'ingested') {
+      appendAgentBubble(`✅ **${esc(session.file_name)}** was already ingested. Ready for CARO 2020 analysis.`);
+      appendAnalysisActionCard();
+    } else if (session.stage === 'analyzed') {
+      appendAgentBubble(`📊 Analysis of **${esc(session.file_name)}** is complete.`);
+      appendReportActionCard();
+    } else if (session.stage === 'done' && session.report_id) {
+      reportId = session.report_id;
+      appendAgentBubble(`🎉 Audit report for **${esc(session.file_name)}** is ready.`);
+      const rep = await fetch(`${API_BASE}/report/${session.report_id}/full`);
+      const rd = await rep.json();
+      appendReportCard(rd.final_report, session.report_id, rd.audit_opinion);
+    } else if (session.stage === 'error') {
+      appendAgentBubble(`⚠️ This session encountered an error: ${esc(session.error || 'Unknown error')}`);
+    }
+
+    loadSessionList();
+    openSSEStream(sid);
+  } catch (e) {
+    console.error(e);
   }
 }
 
-// ── Download ──────────────────────────────────────────────────────────────────
-function downloadReport() {
-  if (!currentReportId) return;
-  fetch(`${API}/report/${currentReportId}/full`)
-    .then(r => r.json())
-    .then(d => {
-      const blob = new Blob([d.final_report || d.executive_summary || ''], {type:'text/markdown'});
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = `audit_${currentReportId}.md`;
-      a.click();
-    });
+// ── Start new session ─────────────────────────────────────────────────────────
+function startNewSession() {
+  currentSessionId = null;
+  analysisData = null;
+  reportId = null;
+  if (eventSource) { eventSource.close(); eventSource = null; }
+  document.getElementById('welcome-screen').style.display = 'flex';
+  document.getElementById('welcome-screen').style.flexDirection = 'column';
+  document.getElementById('welcome-screen').style.alignItems = 'center';
+  document.getElementById('bottom-bar').style.display = 'none';
+  document.getElementById('header-session-id').style.display = 'none';
+  document.getElementById('header-sub').textContent = 'Upload a financial PDF to begin';
+  clearChat(true);
+}
+
+// ── File handling ─────────────────────────────────────────────────────────────
+function onDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function onDrop(e, src) {
+  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.pdf')) uploadFile(f);
+}
+function onFileSelect(e, src) {
+  const f = e.target.files[0];
+  if (f) uploadFile(f);
+  e.target.value = '';
+}
+
+async function uploadFile(file) {
+  switchToChatView(file.name);
+  appendUserBubble(`📎 Uploading **${esc(file.name)}** (${(file.size/1024).toFixed(0)} KB)…`);
+  const thinking = appendThinking();
+
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const r = await fetch(`${API_BASE}/session/start`, {method:'POST', body:fd});
+    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+    const d = await r.json();
+    currentSessionId = d.session_id;
+    thinking.remove();
+    document.getElementById('header-session-id').textContent = `Session ${d.session_id}`;
+    document.getElementById('header-session-id').style.display = 'block';
+    openSSEStream(d.session_id);
+    loadSessionList();
+  } catch (err) {
+    thinking.remove();
+    appendAgentBubble(`❌ Upload failed: ${esc(String(err))}`);
+  }
+}
+
+// ── SSE ───────────────────────────────────────────────────────────────────────
+function openSSEStream(sid) {
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource(`${API_BASE}/session/${sid}/stream`);
+
+  eventSource.onmessage = (e) => {
+    const ev = JSON.parse(e.data);
+    handleSSEEvent(ev);
+  };
+
+  eventSource.onerror = () => {
+    // Auto-reconnects; poll status as fallback
+    setTimeout(() => pollSessionStatus(sid), 3000);
+  };
+}
+
+function handleSSEEvent(ev) {
+  switch (ev.type) {
+
+    case 'ping': break; // keepalive, ignore
+
+    case 'progress':
+      appendProgressStep(ev.message, false);
+      break;
+
+    case 'ingestion_complete':
+      markLastProgressDone();
+      appendAgentBubble(
+        `✅ I've parsed **${esc(ev.file_name)}** and extracted **${ev.text_length?.toLocaleString() || '?'} characters** of financial data.\n\n` +
+        `Shall I run a full **CARO 2020** clause-by-clause compliance analysis? This will:\n` +
+        `• Query the rules knowledge base\n• Compute financial ratios\n• Check all 21 CARO clauses`
+      );
+      appendAnalysisActionCard();
+      loadSessionList();
+      break;
+
+    case 'analysis_complete':
+      markLastProgressDone();
+      analysisData = ev;
+      appendAnalysisResult(ev);
+      appendReportActionCard();
+      loadSessionList();
+      break;
+
+    case 'report_complete':
+      markLastProgressDone();
+      reportId = ev.report_id;
+      appendAgentBubble(
+        `🎉 The **Independent Auditor's Report** is ready.\n\n` +
+        `**Audit Opinion:** ${esc(ev.audit_opinion || 'Qualified')}`
+      );
+      appendReportCard(ev.final_report, ev.report_id, ev.audit_opinion);
+      loadSessionList();
+      if (eventSource) { eventSource.close(); eventSource = null; }
+      break;
+
+    case 'error':
+      markLastProgressDone();
+      appendAgentBubble(`⚠️ **Something went wrong:** ${esc(ev.message)}`);
+      loadSessionList();
+      break;
+
+    case 'reconnect_state':
+      // Already handled via loadSession()
+      break;
+
+    case 'stream_end':
+      if (eventSource) { eventSource.close(); eventSource = null; }
+      break;
+  }
+}
+
+// ── Polling fallback ──────────────────────────────────────────────────────────
+async function pollSessionStatus(sid) {
+  if (sid !== currentSessionId) return;
+  try {
+    const r = await fetch(`${API_BASE}/session/${sid}/status`);
+    const s = await r.json();
+    if (s.stage === 'done' && s.report_id && !reportId) {
+      await loadSession(sid);
+    }
+  } catch {}
+}
+
+// ── Analysis & Report triggers ────────────────────────────────────────────────
+async function triggerAnalysis() {
+  disableActionCard();
+  appendUserBubble('✅ Yes — run CARO 2020 analysis');
+  try {
+    const r = await fetch(`${API_BASE}/session/${currentSessionId}/analyze`, {method:'POST'});
+    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+  } catch (err) {
+    appendAgentBubble(`❌ Could not start analysis: ${esc(String(err))}`);
+  }
+}
+
+async function triggerReport() {
+  disableActionCard();
+  appendUserBubble('📝 Yes — generate the audit report');
+  try {
+    const r = await fetch(`${API_BASE}/session/${currentSessionId}/report`, {method:'POST'});
+    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
+  } catch (err) {
+    appendAgentBubble(`❌ Could not start report: ${esc(String(err))}`);
+  }
+}
+
+// ── DOM helpers ───────────────────────────────────────────────────────────────
+function clearChat(keepWelcome=false) {
+  const msgs = document.getElementById('chat-messages');
+  msgs.innerHTML = keepWelcome
+    ? document.getElementById('welcome-screen')?.outerHTML || ''
+    : '';
+}
+
+function switchToChatView(fileName) {
+  document.getElementById('welcome-screen')?.remove?.();
+  document.getElementById('bottom-bar').style.display = 'block';
+  document.getElementById('header-sub').textContent = fileName;
+}
+
+function scrollBottom() {
+  const c = document.getElementById('chat-messages');
+  c.scrollTop = c.scrollHeight;
+}
+
+function appendAgentBubble(mdText) {
+  const wrap = document.createElement('div');
+  wrap.className = 'message';
+  wrap.innerHTML = `
+    <div class="avatar agent">🤖</div>
+    <div class="bubble agent">${marked.parse(mdText)}</div>
+  `;
+  document.getElementById('chat-messages').appendChild(wrap);
+  scrollBottom();
+  return wrap;
+}
+
+function appendUserBubble(mdText) {
+  const wrap = document.createElement('div');
+  wrap.className = 'message user';
+  wrap.innerHTML = `
+    <div class="avatar user-av">👤</div>
+    <div class="bubble user">${marked.parse(mdText)}</div>
+  `;
+  document.getElementById('chat-messages').appendChild(wrap);
+  scrollBottom();
+  return wrap;
+}
+
+function appendThinking() {
+  const wrap = document.createElement('div');
+  wrap.className = 'message';
+  wrap.innerHTML = `
+    <div class="avatar agent">🤖</div>
+    <div class="bubble agent">
+      <div class="thinking"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    </div>`;
+  document.getElementById('chat-messages').appendChild(wrap);
+  scrollBottom();
+  return wrap;
+}
+
+let _lastProgressEl = null;
+function appendProgressStep(msg, done=false) {
+  const el = document.createElement('div');
+  el.className = 'progress-msg';
+  el.innerHTML = done
+    ? `<span class="progress-check">✓</span><span>${esc(msg)}</span>`
+    : `<div class="progress-spinner"></div><span>${esc(msg)}</span>`;
+  document.getElementById('chat-messages').appendChild(el);
+  _lastProgressEl = el;
+  scrollBottom();
+  return el;
+}
+
+function markLastProgressDone() {
+  if (_lastProgressEl) {
+    const text = _lastProgressEl.querySelector('span')?.textContent || '';
+    _lastProgressEl.innerHTML = `<span class="progress-check">✓</span><span>${esc(text)}</span>`;
+    _lastProgressEl = null;
+  }
+}
+
+function appendAnalysisActionCard() {
+  const el = document.createElement('div');
+  el.className = 'action-card';
+  el.id = 'current-action-card';
+  el.innerHTML = `
+    <div class="action-card-title">Run CARO 2020 Compliance Analysis?</div>
+    <div class="action-card-sub">
+      This will query the pre-ingested rules knowledge base, compute financial ratios
+      using Python, and perform a clause-by-clause CARO 2020 assessment. 
+      Typically takes 1–3 minutes on free-tier API.
+    </div>
+    <div class="action-btns">
+      <button class="btn-primary" onclick="triggerAnalysis()">Yes, run analysis →</button>
+      <button class="btn-secondary" onclick="startNewSession()">Upload different file</button>
+    </div>`;
+  document.getElementById('chat-messages').appendChild(el);
+  scrollBottom();
+}
+
+function appendReportActionCard() {
+  const el = document.createElement('div');
+  el.className = 'action-card';
+  el.id = 'current-action-card';
+  el.innerHTML = `
+    <div class="action-card-title">Generate Independent Auditor's Report?</div>
+    <div class="action-card-sub">
+      I'll now synthesize all findings into a formal publication-ready audit report
+      following ISA 700/705/706 and CARO 2020 standards. Takes ~1 minute.
+    </div>
+    <div class="action-btns">
+      <button class="btn-primary" onclick="triggerReport()">Yes, generate report →</button>
+      <button class="btn-secondary" onclick="startNewSession()">Start over</button>
+    </div>`;
+  document.getElementById('chat-messages').appendChild(el);
+  scrollBottom();
+}
+
+function appendAnalysisResult(ev) {
+  const el = document.createElement('div');
+  el.className = 'message';
+  el.innerHTML = `<div class="avatar agent">🤖</div><div style="flex:1;max-width:72%">
+    <div class="bubble agent" style="border-bottom-left-radius:4px">
+      ${marked.parse(
+        `📊 **CARO 2020 analysis complete.** Here's a summary of findings:`
+      )}
+    </div>
+    <div class="findings-card">
+      <div class="findings-header" onclick="toggleFindings(this)">
+        <div class="findings-header-left">
+          🔍 Audit Findings
+          <div class="severity-chips">
+            <span class="chip chip-high">HIGH ${ev.high_count||0}</span>
+            <span class="chip chip-medium">MED ${ev.medium_count||0}</span>
+            <span class="chip chip-low">LOW ${ev.low_count||0}</span>
+          </div>
+        </div>
+        <span class="findings-toggle">Show ▾</span>
+      </div>
+      <div class="findings-body" style="display:none">${esc(ev.findings_preview||'')}</div>
+    </div>
+  </div>`;
+  document.getElementById('chat-messages').appendChild(el);
+  scrollBottom();
+}
+
+function toggleFindings(header) {
+  const body = header.nextElementSibling;
+  const toggle = header.querySelector('.findings-toggle');
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    toggle.textContent = 'Hide ▴';
+  } else {
+    body.style.display = 'none';
+    toggle.textContent = 'Show ▾';
+  }
+}
+
+function appendReportCard(reportMd, repId, opinion) {
+  const el = document.createElement('div');
+  el.className = 'report-card';
+  el.innerHTML = `
+    <div class="report-card-header">
+      <div>
+        <div class="report-card-title">Independent Auditor's Report</div>
+        <div class="report-card-meta">ID: ${esc(repId)} · Opinion: ${esc(opinion||'—')}</div>
+      </div>
+      <div class="report-actions">
+        <button class="btn-icon" onclick="copyReport()">⎘ Copy</button>
+        <button class="btn-icon" onclick="downloadReport('${esc(repId)}')">↓ Download</button>
+      </div>
+    </div>
+    <div class="report-body">${marked.parse(reportMd||'*(Report content unavailable)*')}</div>`;
+  document.getElementById('chat-messages').appendChild(el);
+  scrollBottom();
+}
+
+function disableActionCard() {
+  const card = document.getElementById('current-action-card');
+  if (card) {
+    card.querySelectorAll('button').forEach(b => b.disabled = true);
+    card.id = '';
+  }
+}
+
+// ── Report export ─────────────────────────────────────────────────────────────
+function copyReport() {
+  const body = document.querySelector('.report-body');
+  if (!body) return;
+  // Get inner text for clean copy
+  const range = document.createRange();
+  range.selectNodeContents(body);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  document.execCommand('copy');
+  sel.removeAllRanges();
+  // Tiny feedback
+  const btn = event.currentTarget;
+  btn.textContent = '✓ Copied';
+  setTimeout(() => btn.textContent = '⎘ Copy', 1800);
+}
+
+async function downloadReport(repId) {
+  try {
+    const r = await fetch(`${API_BASE}/report/${repId}`);
+    const text = await r.text();
+    const blob = new Blob([text], {type:'text/markdown'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `audit_report_${repId}.md`;
+    a.click();
+  } catch { alert('Download failed. Try again.'); }
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
-function showAlert(id, msg, type) {
-  document.getElementById(id).innerHTML =
-    `<div class="alert alert-${type}">${msg}</div>`;
-}
-function clearAlert(id) { document.getElementById(id).innerHTML = ''; }
-
-function setProgress(show) {
-  const el = document.getElementById('audit-progress');
-  el.style.display = show ? 'block' : 'none';
-  if (!show) {
-    document.getElementById('prog-fill').style.width = '0%';
-    document.getElementById('prog-label').textContent = '';
-  }
-  document.getElementById('audit-btn').disabled = show;
-  document.getElementById('analyze-btn').disabled = show;
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
-function showEmptyState(show) {
-  document.getElementById('report-empty').style.display = show ? 'block' : 'none';
+function relativeTime(iso) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff/60000);
+  if (m < 1) return 'Just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m/60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h/24)}d ago`;
 }
 
-// Drag-and-drop for audit zone
-['dragover','drop'].forEach(ev => {
-  document.getElementById('audit-zone').addEventListener(ev, e => {
-    e.preventDefault();
-    if (ev === 'drop' && e.dataTransfer.files[0]) {
-      const input = document.getElementById('audit-input');
-      const dt = new DataTransfer();
-      dt.items.add(e.dataTransfer.files[0]);
-      input.files = dt.files;
-      onAuditFileChange();
-    }
-    document.getElementById('audit-zone').classList.toggle('drag-over', ev === 'dragover');
-  });
-});
-
-init();
+// Configure marked
+marked.setOptions({ breaks: true, gfm: true });
 </script>
 </body>
 </html>
