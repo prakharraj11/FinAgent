@@ -396,13 +396,15 @@ body::before{
         <span class="upload-bar-icon">📎</span><span class="upload-bar-text">Drop a new PDF, or <span>click to upload</span> a different document</span><span class="upload-bar-arrow">↑</span>
       </div>
       <input type="file" id="main-file-input" accept=".pdf" onchange="onFileSelect(event,'main')"/>
-      <div class="api-url-row"><span class="api-url-label">API</span><input class="api-url-input" id="api-url-input" value="http://localhost:8000" oninput="API_BASE=this.value.replace(/\/$/,'')"/></div>
+      <div class="api-url-row"><span class="api-url-label">API</span><input class="api-url-input" id="api-url-input" value="" oninput="API_BASE=this.value.replace(/\/$/,'')"/></div>
     </div>
   </div>
 </div>
 
 <script>
-let API_BASE = 'http://127.0.0.1:8000';
+let API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? `${window.location.protocol}//${window.location.hostname}:8000`
+  : '';
 let currentSessionId = null;
 let eventSource = null;
 let analysisData = null;
