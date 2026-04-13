@@ -1,22 +1,38 @@
-# Web Framework
-fastapi==0.115.5
-python-multipart==0.0.12
-uvicorn==0.32.1
-pydantic==2.10.3
+# ── Web Framework ──────────────────────────────────────────────────────────────
+fastapi
+uvicorn[standard]
+pydantic
+python-multipart          # Required by FastAPI for UploadFile / Form
 
-# Environment
-python-dotenv==1.0.1
+# ── Environment ────────────────────────────────────────────────────────────────
+python-dotenv
 
-# AI & LLMs
-langgraph==0.2.56
-langchain-core>=0.3.0,<0.4.0       # ← changed from ==1.2.28
-langchain-google-genai==2.0.7
-google-genai==1.9.0
-openai==2.31.0
+# ── LLM / AI Clients ───────────────────────────────────────────────────────────
+openai                    # OpenAI-compatible wrapper used to hit Groq API
+google-genai              # New Google GenAI SDK (from google import genai) — embeddings
+google-generativeai       # Older SDK required internally by langchain-google-genai
 
-# Data, PDF Parsing & OCR
-numpy==1.26.4
-PyMuPDF==1.27.2.2
-pytesseract==0.3.13
-pillow==12.2.0
-reportlab==4.4.10
+# ── LangChain / LangGraph ──────────────────────────────────────────────────────
+langgraph
+langchain-core
+langchain-google-genai    # ChatGoogleGenerativeAI used in report_agent.py
+langchain-community       # PyPDFLoader used in rules_store.py
+
+# ── Vector Store ───────────────────────────────────────────────────────────────
+chromadb
+
+# ── PDF Parsing ────────────────────────────────────────────────────────────────
+PyMuPDF                   # import fitz — used in agent.py for PDF text extraction
+pypdf                     # Required by langchain-community's PyPDFLoader
+pytesseract               # OCR fallback for scanned/image-only PDF pages
+Pillow                    # PIL — used alongside pytesseract for image processing
+
+# ── Numerical / Scientific ─────────────────────────────────────────────────────
+numpy
+
+# ── PDF Report Generation ──────────────────────────────────────────────────────
+reportlab                 # create_pdf_report() in report_agent.py
+
+# ── HTTP / Async ───────────────────────────────────────────────────────────────
+httpx                     # Used internally by the OpenAI async client
+aiofiles                  # Async file I/O, required by some FastAPI file helpers
