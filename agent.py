@@ -16,7 +16,8 @@ from typing import TypedDict
 from functools import lru_cache
 
 from langgraph.graph import StateGraph, END
-from langchain_community.document_loaders import PyPDFLoader
+# from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 # NEW: use google-genai SDK directly for embeddings (fixes v1beta 404)
@@ -167,19 +168,50 @@ class IngestionState(TypedDict):
 # ──────────────────────────────────────────────────────────────────────────────
 # Node 1 – Parse PDF
 # ──────────────────────────────────────────────────────────────────────────────
+# def parse_document(state: IngestionState) -> dict:
+#     """Load PDF pages and join them into a single text block."""
+#     try:
+#         loader = PyPDFLoader(state["file_path"])
+#         docs   = loader.load()
+#         full_text = "\n".join(doc.page_content for doc in docs)
+#         if not full_text.strip():
+#             return {"status": "failed", "error": "PDF appears to be empty or unreadable."}
+#         return {"raw_text": full_text, "status": "parsed"}
+#     except Exception as exc:
+#         return {"status": "failed", "error": f"Parsing error: {exc}"}
+
 def parse_document(state: IngestionState) -> dict:
-    """Load PDF pages and join them into a single text block."""
     try:
-        loader = PyPDFLoader(state["file_path"])
-        docs   = loader.load()
-        full_text = "\n".join(doc.page_content for doc in docs)
+        import fitz  # PyMuPDF
+        import pytesseract
+        from PIL import Image
+        import io
+
+        doc = fitz.open(state["file_path"])
+        full_text = ""
+
+        for page in doc:
+            text = page.get_text()
+
+            # 🔥 If text exists → use it
+            if text and text.strip():
+                full_text += text
+            else:
+                # 🔥 OCR fallback (for scanned pages)
+                pix = page.get_pixmap()
+                img_bytes = pix.tobytes("png")
+                image = Image.open(io.BytesIO(img_bytes))
+
+                ocr_text = pytesseract.image_to_string(image)
+                full_text += ocr_text or ""
+
         if not full_text.strip():
             return {"status": "failed", "error": "PDF appears to be empty or unreadable."}
+
         return {"raw_text": full_text, "status": "parsed"}
+
     except Exception as exc:
         return {"status": "failed", "error": f"Parsing error: {exc}"}
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Node 2 – Build Knowledge Graph with LightRAG
 # ──────────────────────────────────────────────────────────────────────────────

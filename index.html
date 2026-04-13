@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FinAudit AI — Autonomous Financial Audit Framework</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+<style>
+  :root {
+    --blue:    #1a56db;
+    --blue-lt: #e8f0fe;
+    --blue-dk: #1341b5;
+    --green:   #057a55;
+    --green-lt:#def7ec;
+    --red:     #c81e1e;
+    --red-lt:  #fde8e8;
+    --amber:   #b45309;
+    --amber-lt:#fef3c7;
+    --gray-50: #f9fafb;
+    --gray-100:#f3f4f6;
+    --gray-200:#e5e7eb;
+    --gray-400:#9ca3af;
+    --gray-600:#4b5563;
+    --gray-800:#1f2937;
+    --shadow:  0 1px 3px rgba(0,0,0,.1), 0 1px 2px rgba(0,0,0,.06);
+    --shadow-md:0 4px 6px rgba(0,0,0,.07), 0 2px 4px rgba(0,0,0,.06);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 15px;
+    color: var(--gray-800);
+    background: var(--gray-50);
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--gray-200);
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: var(--shadow);
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--blue);
+  }
+  .logo svg { width: 28px; height: 28px; }
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: .85rem;
+  }
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    background: var(--gray-100);
+    border-radius: 999px;
+    padding: .25rem .7rem;
+    font-size: .8rem;
+    color: var(--gray-600);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .dot.green { background: #10b981; }
+  .dot.red   { background: #ef4444; }
+  .dot.gray  { background: var(--gray-400); }
+
+  /* ── Layout ── */
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  /* ── Cards ── */
+  .card {
+    background: #fff;
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .card-header {
+    padding: .9rem 1.2rem;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .card-header h2 {
+    font-size: .95rem;
+    font-weight: 600;
+  }
+  .badge {
+    font-size: .7rem;
+    font-weight: 600;
+    padding: .15rem .5rem;
+    border-radius: 999px;
+    background: var(--blue-lt);
+    color: var(--blue);
+  }
+  .card-body { padding: 1.2rem; }
+
+  /* ── Steps sidebar ── */
+  .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+
+  .step-number {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: var(--blue);
+    color: #fff;
+    font-size: .75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .step-number.done { background: var(--green); }
+  .step-number.gray { background: var(--gray-400); }
+
+  /* ── Forms ── */
+  label {
+    display: block;
+    font-size: .8rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    margin-bottom: .35rem;
+  }
+  .upload-zone {
+    border: 2px dashed var(--gray-200);
+    border-radius: 8px;
+    padding: 1.5rem 1rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+  }
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--blue);
+    background: var(--blue-lt);
+  }
+  .upload-zone input { display: none; }
+  .upload-zone p { font-size: .8rem; color: var(--gray-400); margin-top: .4rem; }
+  .upload-zone .file-name {
+    font-size: .85rem;
+    color: var(--blue);
+    font-weight: 600;
+    margin-top: .3rem;
+  }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-top: .75rem;
+    padding: .6rem .8rem;
+    background: var(--amber-lt);
+    border-radius: 6px;
+    border: 1px solid #fcd34d;
+  }
+  .checkbox-row input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--blue); }
+  .checkbox-row label {
+    margin: 0;
+    font-size: .8rem;
+    color: var(--amber);
+    cursor: pointer;
+  }
+
+  input[type=text], input[type=url] {
+    width: 100%;
+    padding: .45rem .7rem;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    font-size: .85rem;
+    color: var(--gray-800);
+    outline: none;
+    transition: border-color .2s;
+  }
+  input[type=text]:focus, input[type=url]:focus { border-color: var(--blue); }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .4rem;
+    font-size: .85rem;
+    font-weight: 600;
+    padding: .55rem 1.1rem;
+    border-radius: 7px;
+    border: none;
+    cursor: pointer;
+    transition: background .15s, transform .1s;
+    text-decoration: none;
+  }
+  .btn:active { transform: scale(.98); }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: var(--blue-dk); }
+  .btn-primary:disabled { background: var(--gray-400); cursor: not-allowed; }
+  .btn-outline {
+    background: #fff;
+    color: var(--gray-800);
+    border: 1px solid var(--gray-200);
+  }
+  .btn-outline:hover { background: var(--gray-100); }
+  .btn-danger { background: var(--red); color: #fff; }
+  .btn-full { width: 100%; }
+
+  /* ── Progress / spinner ── */
+  .progress-wrap { margin-top: 1rem; }
+  .progress-bar {
+    height: 4px;
+    background: var(--gray-200);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--blue);
+    border-radius: 4px;
+    transition: width .4s;
+    width: 0%;
+  }
+  .progress-label {
+    font-size: .75rem;
+    color: var(--gray-600);
+    margin-top: .4rem;
+  }
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,.4);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Alert banners ── */
+  .alert {
+    padding: .7rem .9rem;
+    border-radius: 7px;
+    font-size: .82rem;
+    display: flex;
+    align-items: flex-start;
+    gap: .5rem;
+    margin-top: .75rem;
+  }
+  .alert-error  { background: var(--red-lt);   color: var(--red);   border: 1px solid #fca5a5; }
+  .alert-success{ background: var(--green-lt); color: var(--green); border: 1px solid #6ee7b7; }
+  .alert-info   { background: var(--blue-lt);  color: var(--blue);  border: 1px solid #93c5fd; }
+  .alert-warn   { background: var(--amber-lt); color: var(--amber); border: 1px solid #fcd34d; }
+
+  /* ── Report output panel ── */
+  #report-panel { grid-column: 2; }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--gray-200);
+    gap: 0;
+    background: var(--gray-50);
+  }
+  .tab {
+    padding: .6rem 1rem;
+    font-size: .82rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--blue); }
+  .tab.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+  .tab-content { display: none; padding: 1.2rem; }
+  .tab-content.active { display: block; }
+
+  /* ── Markdown report rendering ── */
+  .report-md h1 { font-size: 1.2rem; margin-bottom: .5rem; color: var(--blue-dk); }
+  .report-md h2 { font-size: 1rem; margin: 1rem 0 .35rem; border-bottom: 1px solid var(--gray-200); padding-bottom: .2rem; }
+  .report-md h3 { font-size: .9rem; margin: .75rem 0 .25rem; color: var(--gray-800); }
+  .report-md p  { margin-bottom: .5rem; line-height: 1.6; font-size: .85rem; }
+  .report-md ul, .report-md ol { padding-left: 1.2rem; margin-bottom: .5rem; }
+  .report-md li { font-size: .85rem; line-height: 1.6; }
+  .report-md table { width: 100%; border-collapse: collapse; margin: .75rem 0; font-size: .82rem; }
+  .report-md th { background: var(--gray-100); font-weight: 600; }
+  .report-md th, .report-md td { border: 1px solid var(--gray-200); padding: .4rem .6rem; text-align: left; }
+  .report-md code { background: var(--gray-100); padding: .1rem .3rem; border-radius: 3px; font-size: .8rem; }
+  .report-md pre  { background: var(--gray-800); color: #e5e7eb; padding: .8rem; border-radius: 6px; overflow-x: auto; font-size: .78rem; margin: .5rem 0; }
+  .report-md pre code { background: none; color: inherit; padding: 0; }
+  .report-md strong { font-weight: 600; }
+  .report-md hr { border: none; border-top: 1px solid var(--gray-200); margin: 1rem 0; }
+
+  /* ── CARO clause grid ── */
+  .clause-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: .5rem;
+    margin-top: .5rem;
+  }
+  .clause-card {
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    padding: .5rem .7rem;
+    font-size: .78rem;
+    display: flex;
+    align-items: flex-start;
+    gap: .4rem;
+  }
+  .clause-num {
+    font-weight: 700;
+    color: var(--blue);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .clause-title { color: var(--gray-600); line-height: 1.3; }
+
+  /* ── Opinion badge ── */
+  .opinion-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .9rem;
+    font-weight: 700;
+    padding: .4rem .9rem;
+    border-radius: 6px;
+    margin-bottom: .75rem;
+  }
+  .opinion-unqualified { background: var(--green-lt); color: var(--green); }
+  .opinion-qualified   { background: var(--amber-lt); color: var(--amber); }
+  .opinion-adverse     { background: var(--red-lt);   color: var(--red);   }
+  .opinion-disclaimer  { background: var(--gray-100); color: var(--gray-600); }
+  .opinion-partial     { background: var(--amber-lt); color: var(--amber); }
+
+  /* ── Reports history ── */
+  .report-list { display: flex; flex-direction: column; gap: .4rem; }
+  .report-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .5rem .7rem;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    font-size: .82rem;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .report-item:hover { background: var(--blue-lt); border-color: var(--blue); }
+  .report-item .rid { font-weight: 600; color: var(--blue); font-family: monospace; }
+
+  /* ── Divider ── */
+  .divider { border: none; border-top: 1px solid var(--gray-200); margin: 1rem 0; }
+
+  /* ── Empty state ── */
+  .empty { text-align: center; padding: 2.5rem 1rem; color: var(--gray-400); }
+  .empty svg { width: 48px; height: 48px; margin: 0 auto .75rem; display: block; opacity: .4; }
+  .empty p { font-size: .85rem; }
+
+  @media (max-width: 720px) {
+    main { grid-template-columns: 1fr; }
+    #report-panel { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M9 17H7A5 5 0 0 1 7 7h2"/>
+      <path d="M15 7h2a5 5 0 1 1 0 10h-2"/>
+      <line x1="8" y1="12" x2="16" y2="12"/>
+    </svg>
+    FinAudit AI
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="server-status">
+      <div class="dot gray" id="server-dot"></div>
+      <span id="server-label">Connecting…</span>
+    </div>
+    <div class="status-pill" id="rules-pill">
+      <div class="dot gray" id="rules-dot"></div>
+      <span id="rules-label">Rules KB: –</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- ────────── SIDEBAR ────────── -->
+  <div class="sidebar">
+
+    <!-- Step 1: Upload Rules -->
+    <div class="card">
+      <div class="card-header">
+        <div class="step-number" id="step1-num">1</div>
+        <h2>Rules Knowledge Base</h2>
+        <span class="badge">Once</span>
+      </div>
+      <div class="card-body">
+        <p style="font-size:.8rem;color:var(--gray-600);margin-bottom:.75rem">
+          Upload CARO 2020, SA standards, Income Tax Act PDFs.
+          Stored permanently — no need to re-upload.
+        </p>
+        <div class="upload-zone" id="rules-zone" onclick="document.getElementById('rules-input').click()">
+          <input type="file" id="rules-input" accept=".pdf" multiple />
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" style="margin:0 auto">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+          </svg>
+          <p>Click or drop PDF files here</p>
+          <div class="file-name" id="rules-file-name"></div>
+        </div>
+        <button class="btn btn-primary btn-full" style="margin-top:.75rem" onclick="uploadRules()" id="rules-btn">
+          Upload Rules PDFs
+        </button>
+        <div id="rules-alert"></div>
+      </div>
+    </div>
+
+    <!-- Step 2: Upload & Audit -->
+    <div class="card">
+      <div class="card-header">
+        <div class="step-number" id="step2-num">2</div>
+        <h2>Audit a Document</h2>
+      </div>
+      <div class="card-body">
+        <label>Financial PDF</label>
+        <div class="upload-zone" id="audit-zone" onclick="document.getElementById('audit-input').click()">
+          <input type="file" id="audit-input" accept=".pdf" onchange="onAuditFileChange()" />
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" style="margin:0 auto">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+          </svg>
+          <p>Click or drop PDF here</p>
+          <div class="file-name" id="audit-file-name"></div>
+        </div>
+
+        <div class="checkbox-row" id="skip-row" style="display:none">
+          <input type="checkbox" id="skip-check" />
+          <label for="skip-check">
+            ⚡ Skip re-ingestion — reuse cached: <strong id="cached-name">–</strong>
+          </label>
+        </div>
+
+        <div style="margin-top:1rem; display:flex; flex-direction:column; gap:.5rem">
+          <button class="btn btn-primary btn-full" onclick="runAudit('audit')" id="audit-btn" disabled>
+            Run Full Audit (Steps 1→3)
+          </button>
+          <button class="btn btn-outline btn-full" onclick="runAudit('analyze')" id="analyze-btn" disabled>
+            Analysis Only (Steps 1→2)
+          </button>
+        </div>
+
+        <div id="audit-progress" style="display:none" class="progress-wrap">
+          <div class="progress-bar"><div class="progress-fill" id="prog-fill"></div></div>
+          <div class="progress-label" id="prog-label">Initialising…</div>
+        </div>
+
+        <div id="audit-alert"></div>
+      </div>
+    </div>
+
+    <!-- Past reports -->
+    <div class="card">
+      <div class="card-header">
+        <div class="step-number gray">↗</div>
+        <h2>Past Reports</h2>
+        <button class="btn btn-outline" style="margin-left:auto;padding:.3rem .6rem;font-size:.75rem" onclick="loadReportList()">Refresh</button>
+      </div>
+      <div class="card-body" id="report-list-body">
+        <div class="empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+          </svg>
+          <p>No saved reports yet</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- ────────── REPORT PANEL ────────── -->
+  <div class="card" id="report-panel">
+    <div class="card-header">
+      <div class="step-number gray">3</div>
+      <h2>Audit Report</h2>
+      <span id="report-id-badge" style="margin-left:auto;font-size:.75rem;color:var(--gray-400);font-family:monospace"></span>
+      <button class="btn btn-outline" style="margin-left:.5rem;padding:.3rem .6rem;font-size:.75rem" id="download-btn" onclick="downloadReport()" style="display:none">⬇ Save</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" id="report-tabs" style="display:none">
+      <div class="tab active" onclick="switchTab('report')">Full Report</div>
+      <div class="tab" onclick="switchTab('findings')">CARO Findings</div>
+      <div class="tab" onclick="switchTab('metrics')">Metrics</div>
+      <div class="tab" onclick="switchTab('summary')">Executive Summary</div>
+    </div>
+
+    <!-- Empty state -->
+    <div id="report-empty" class="empty" style="padding:4rem 1rem">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+        <path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      <p>Upload a financial PDF and run the audit to see the report here.</p>
+    </div>
+
+    <!-- Tab: Full Report -->
+    <div class="tab-content active" id="tab-report" style="display:none">
+      <div id="opinion-display"></div>
+      <div class="report-md" id="report-md-body"></div>
+    </div>
+
+    <!-- Tab: CARO Findings -->
+    <div class="tab-content" id="tab-findings" style="display:none">
+      <div class="report-md" id="findings-md-body"></div>
+    </div>
+
+    <!-- Tab: Metrics -->
+    <div class="tab-content" id="tab-metrics" style="display:none">
+      <pre id="metrics-body" style="font-size:.82rem;white-space:pre-wrap;font-family:monospace;color:var(--gray-800)"></pre>
+    </div>
+
+    <!-- Tab: Summary -->
+    <div class="tab-content" id="tab-summary" style="display:none">
+      <div id="opinion-display-2"></div>
+      <div class="report-md" id="summary-md-body"></div>
+    </div>
+
+  </div><!-- /report-panel -->
+</main>
+
+<script>
+const API = 'http://localhost:8000';
+let currentReportId = null;
+
+// ── Startup ──────────────────────────────────────────────────────────────────
+async function init() {
+  await checkServer();
+  await checkCache();
+  await loadReportList();
+}
+
+async function checkServer() {
+  try {
+    const r = await fetch(`${API}/`);
+    const d = await r.json();
+    document.getElementById('server-dot').className = 'dot green';
+    document.getElementById('server-label').textContent = 'Server online';
+
+    const chunks = d.rules_kb?.chunks ?? 0;
+    document.getElementById('rules-dot').className = chunks > 0 ? 'dot green' : 'dot red';
+    document.getElementById('rules-label').textContent = `Rules KB: ${chunks} chunks`;
+    if (chunks > 0) {
+      document.getElementById('step1-num').className = 'step-number done';
+    }
+  } catch {
+    document.getElementById('server-dot').className = 'dot red';
+    document.getElementById('server-label').textContent = 'Server offline';
+  }
+}
+
+async function checkCache() {
+  try {
+    const r = await fetch(`${API}/last-run/`);
+    const d = await r.json();
+    if (d.cached) {
+      document.getElementById('skip-row').style.display = 'flex';
+      document.getElementById('cached-name').textContent = d.file_name;
+    }
+  } catch {}
+}
+
+// ── Rules upload ─────────────────────────────────────────────────────────────
+document.getElementById('rules-input').onchange = function() {
+  const files = Array.from(this.files);
+  document.getElementById('rules-file-name').textContent = files.map(f => f.name).join(', ');
+};
+
+async function uploadRules() {
+  const input = document.getElementById('rules-input');
+  if (!input.files.length) return showAlert('rules-alert', 'Select at least one PDF.', 'error');
+
+  const btn = document.getElementById('rules-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Uploading…';
+
+  const fd = new FormData();
+  for (const f of input.files) fd.append('files', f);
+
+  try {
+    const r = await fetch(`${API}/ingest-rules/`, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || 'Upload failed');
+    showAlert('rules-alert', `✓ ${d.message}`, 'success');
+    document.getElementById('step1-num').className = 'step-number done';
+    await checkServer();
+  } catch(e) {
+    showAlert('rules-alert', `Error: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Upload Rules PDFs';
+  }
+}
+
+// ── Audit file pick ───────────────────────────────────────────────────────────
+function onAuditFileChange() {
+  const input = document.getElementById('audit-input');
+  const name = input.files[0]?.name || '';
+  document.getElementById('audit-file-name').textContent = name;
+  document.getElementById('audit-btn').disabled = !name;
+  document.getElementById('analyze-btn').disabled = !name;
+}
+
+// ── Run audit ─────────────────────────────────────────────────────────────────
+const STEPS = [
+  [10,  'Step 1 — Parsing PDF…'],
+  [25,  'Step 1 — Building Knowledge Graph…'],
+  [45,  'Step 2 — Retrieving CARO 2020 rules…'],
+  [60,  'Step 2 — Running Python financial calculations…'],
+  [75,  'Step 2 — Clause-by-clause gap analysis…'],
+  [88,  'Step 3 — Generating audit report…'],
+  [95,  'Step 3 — Quality review pass…'],
+  [100, 'Complete!'],
+];
+
+async function runAudit(mode) {
+  const input = document.getElementById('audit-input');
+  const skip  = document.getElementById('skip-check').checked;
+
+  if (!input.files[0] && !skip) return showAlert('audit-alert', 'Please select a PDF file.', 'error');
+
+  setProgress(true);
+  clearAlert('audit-alert');
+  showEmptyState(false);
+
+  // Animate progress bar through stages
+  let stepIdx = 0;
+  const interval = setInterval(() => {
+    if (stepIdx < STEPS.length - 1) {
+      const [pct, label] = STEPS[stepIdx++];
+      document.getElementById('prog-fill').style.width = pct + '%';
+      document.getElementById('prog-label').textContent = label;
+    }
+  }, mode === 'audit' ? 22000 : 16000);
+
+  const fd = new FormData();
+  // Always attach the file (even dummy) — server needs the field
+  if (input.files[0]) fd.append('file', input.files[0]);
+  else fd.append('file', new Blob([''], {type:'application/pdf'}), 'reuse.pdf');
+  fd.append('skip_ingestion', skip ? 'true' : 'false');
+
+  const endpoint = mode === 'audit' ? '/audit/' : '/analyze/';
+
+  try {
+    const r = await fetch(`${API}${endpoint}`, { method: 'POST', body: fd });
+    const d = await r.json();
+    clearInterval(interval);
+
+    if (!r.ok) {
+      setProgress(false);
+      return showAlert('audit-alert', `Server error: ${d.detail || JSON.stringify(d)}`, 'error');
+    }
+
+    document.getElementById('prog-fill').style.width = '100%';
+    document.getElementById('prog-label').textContent = 'Done!';
+
+    setTimeout(() => setProgress(false), 800);
+
+    if (d.error) showAlert('audit-alert', `⚠ Partial result saved (${d.error.slice(0,120)}…)`, 'warn');
+    else         showAlert('audit-alert', `✓ Report saved — ID: ${d.report_id}`, 'success');
+
+    displayReport(d);
+    await loadReportList();
+    await checkCache();
+
+  } catch(e) {
+    clearInterval(interval);
+    setProgress(false);
+    showAlert('audit-alert', `Request failed: ${e.message}`, 'error');
+  }
+}
+
+// ── Display report ────────────────────────────────────────────────────────────
+function displayReport(d) {
+  currentReportId = d.report_id;
+  document.getElementById('report-id-badge').textContent = `#${d.report_id}`;
+  document.getElementById('report-tabs').style.display = 'flex';
+  document.getElementById('report-empty').style.display = 'none';
+  document.getElementById('tab-report').style.display = 'block';
+  document.getElementById('download-btn').style.display = '';
+
+  // Opinion badge
+  const opinion = d.audit_opinion || 'Unknown';
+  const cls = {
+    'Unqualified':'opinion-unqualified','Qualified':'opinion-qualified',
+    'Adverse':'opinion-adverse','Disclaimer':'opinion-disclaimer','partial':'opinion-partial'
+  }[opinion] || 'opinion-partial';
+  const badgeHtml = `<div class="opinion-badge ${cls}">Audit Opinion: ${opinion}</div>`;
+  document.getElementById('opinion-display').innerHTML = badgeHtml;
+  document.getElementById('opinion-display-2').innerHTML = badgeHtml;
+
+  // Full report
+  const reportText = d.final_report || d.executive_summary || '(No report content)';
+  document.getElementById('report-md-body').innerHTML = marked.parse(reportText);
+
+  // Findings
+  const findings = (d.audit_findings || []).join('\n\n---\n\n');
+  document.getElementById('findings-md-body').innerHTML = marked.parse(findings || '(No findings)');
+
+  // Metrics
+  document.getElementById('metrics-body').textContent = d.calculation_results || '(No metrics computed)';
+
+  // Summary
+  document.getElementById('summary-md-body').innerHTML = marked.parse(d.executive_summary || '(No summary)');
+
+  switchTab('report');
+}
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t, i) => {
+    const names = ['report','findings','metrics','summary'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  ['report','findings','metrics','summary'].forEach(n => {
+    const el = document.getElementById(`tab-${n}`);
+    if (el) {
+      el.style.display = n === name ? 'block' : 'none';
+      el.classList.toggle('active', n === name);
+    }
+  });
+}
+
+// ── Report list ───────────────────────────────────────────────────────────────
+async function loadReportList() {
+  try {
+    const r = await fetch(`${API}/reports/`);
+    const d = await r.json();
+    const body = document.getElementById('report-list-body');
+    if (!d.report_ids?.length) {
+      body.innerHTML = '<div class="empty"><p>No saved reports yet</p></div>';
+      return;
+    }
+    const list = document.createElement('div');
+    list.className = 'report-list';
+    d.report_ids.slice().reverse().forEach(id => {
+      const item = document.createElement('div');
+      item.className = 'report-item';
+      item.innerHTML = `<span class="rid">#${id}</span><span style="color:var(--gray-400);font-size:.75rem">Click to load</span>`;
+      item.onclick = () => loadSavedReport(id);
+      list.appendChild(item);
+    });
+    body.innerHTML = '';
+    body.appendChild(list);
+  } catch {}
+}
+
+async function loadSavedReport(id) {
+  try {
+    const r = await fetch(`${API}/report/${id}/full`);
+    const d = await r.json();
+    d.report_id = id;
+    displayReport(d);
+  } catch(e) {
+    showAlert('audit-alert', `Could not load report ${id}: ${e.message}`, 'error');
+  }
+}
+
+// ── Download ──────────────────────────────────────────────────────────────────
+function downloadReport() {
+  if (!currentReportId) return;
+  fetch(`${API}/report/${currentReportId}/full`)
+    .then(r => r.json())
+    .then(d => {
+      const blob = new Blob([d.final_report || d.executive_summary || ''], {type:'text/markdown'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `audit_${currentReportId}.md`;
+      a.click();
+    });
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function showAlert(id, msg, type) {
+  document.getElementById(id).innerHTML =
+    `<div class="alert alert-${type}">${msg}</div>`;
+}
+function clearAlert(id) { document.getElementById(id).innerHTML = ''; }
+
+function setProgress(show) {
+  const el = document.getElementById('audit-progress');
+  el.style.display = show ? 'block' : 'none';
+  if (!show) {
+    document.getElementById('prog-fill').style.width = '0%';
+    document.getElementById('prog-label').textContent = '';
+  }
+  document.getElementById('audit-btn').disabled = show;
+  document.getElementById('analyze-btn').disabled = show;
+}
+
+function showEmptyState(show) {
+  document.getElementById('report-empty').style.display = show ? 'block' : 'none';
+}
+
+// Drag-and-drop for audit zone
+['dragover','drop'].forEach(ev => {
+  document.getElementById('audit-zone').addEventListener(ev, e => {
+    e.preventDefault();
+    if (ev === 'drop' && e.dataTransfer.files[0]) {
+      const input = document.getElementById('audit-input');
+      const dt = new DataTransfer();
+      dt.items.add(e.dataTransfer.files[0]);
+      input.files = dt.files;
+      onAuditFileChange();
+    }
+    document.getElementById('audit-zone').classList.toggle('drag-over', ev === 'dragover');
+  });
+});
+
+init();
+</script>
+</body>
+</html>
