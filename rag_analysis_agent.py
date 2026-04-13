@@ -1,18 +1,12 @@
 """
-Step 2 – RAG Analysis Agent
-==============================
-Three-node LangGraph pipeline that runs after document ingestion:
-
-  librarian  →  calculator  →  auditor
-      │               │            │
-  Queries KG     LLM writes    Gap analysis
-  for rules      Python code,  against rules +
-  & standards    executes it   computed metrics
-
-Exports
--------
-- analysis_pipeline : compiled LangGraph pipeline (ainvoke-able)
-- AnalysisState     : TypedDict for state hand-off
+Step 2 – RAG Analysis Agent  (v3.0 — OpenAI Wrapper Migration)
+=============================================================
+Changes in v3.0
+---------------
+- Removed LangChain ChatGoogleGenerativeAI.
+- Fully wired the Calculator and Auditor nodes to use the new OpenAI 
+  wrapper hitting the Groq API to bypass Google's 429 limits.
+- Fixed import names to match the updated agent.py.
 """
 
 import ast
@@ -27,27 +21,17 @@ from typing import TypedDict, List
 
 import numpy as np
 from langgraph.graph import StateGraph, END
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, SystemMessage
 
-from lightrag import LightRAG
-from lightrag.utils import EmbeddingFunc
-
-# FIX: LightRAG requires QueryParam for query configuration — a plain dict
-# does not work and silently falls back to default (naive) mode.
-try:
-    from lightrag.base import QueryParam
-except ImportError:
-    # Older LightRAG versions expose it at the top level
-    from lightrag import QueryParam  # type: ignore[no-redef]
-
-# Shared helpers from Step 1  (file is named agent.py — fixed import)
+# Updated imports from agent.py
 from agent import (
-    gemini_complete, gemini_embed,
+    gemini_embed,
     WORKING_DIR, EMBEDDING_DIM,
-    _invoke_with_retry, _is_retryable,
-    api_key,
+    _invoke_with_retry, _is_retryable
 )
+
+from rules_store import query_rules
+from caro_2020 import CARO_2020_CLAUSES, get_clause_summary
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # State
@@ -75,7 +59,6 @@ _ALLOWED_BUILTINS = [
     "None", "True", "False",
 ]
 
-
 def _safe_globals() -> dict:
     import builtins as _b
     bdict = vars(_b)
@@ -86,33 +69,24 @@ def _safe_globals() -> dict:
         "np":           np,
     }
 
-
 def safe_python_executor(code: str) -> dict:
-    """
-    Execute *code* in a sandboxed namespace.
-    Returns {"success": bool, "output": str, "error": str}.
-    """
     stdout_buf = io.StringIO()
     stderr_buf = io.StringIO()
-
     try:
         ast.parse(code)
     except SyntaxError as exc:
         return {"success": False, "output": "", "error": f"SyntaxError: {exc}"}
-
     try:
         with (
             contextlib.redirect_stdout(stdout_buf),
             contextlib.redirect_stderr(stderr_buf),
         ):
-            exec(code, _safe_globals())  # noqa: S102
-
+            exec(code, _safe_globals())
         return {
             "success": True,
             "output":  stdout_buf.getvalue().strip(),
             "error":   stderr_buf.getvalue().strip(),
         }
-
     except Exception as exc:
         return {
             "success": False,
@@ -122,41 +96,66 @@ def safe_python_executor(code: str) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Node 1 – Librarian  (LightRAG retrieval)
+# CARO helpers
+# ──────────────────────────────────────────────────────────────────────────────
+def _build_caro_checklist() -> str:
+    lines = [
+        "CARO 2020 — COMPANIES (AUDITOR'S REPORT) ORDER — ALL 21 CLAUSES",
+        "=" * 65,
+        "For each clause, assess: COMPLIANT / NON-COMPLIANT / INSUFFICIENT DATA / NOT APPLICABLE",
+        "",
+    ]
+    for clause in CARO_2020_CLAUSES:
+        lines.append(f"Clause {clause['clause_number']:02d}: {clause['title']}")
+        lines.append(f"  Requirement: {clause['legal_text'][:200]}...")
+        lines.append("  Check:")
+        for q in clause["audit_questions"][:3]:
+            lines.append(f"    • {q}")
+        lines.append(f"  Look for: {', '.join(clause['data_fields'][:4])}")
+        lines.append("")
+    return "\n".join(lines)
+
+def _build_caro_data_fields() -> str:
+    fields: set = set()
+    for clause in CARO_2020_CLAUSES:
+        fields.update(clause["data_fields"])
+    return ", ".join(sorted(fields))
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Node 1 – Librarian
 # ──────────────────────────────────────────────────────────────────────────────
 async def librarian_node(state: AnalysisState) -> dict:
-    """
-    Query the LightRAG Knowledge Graph for compliance rules, financial
-    thresholds, and risk indicators using QueryParam (not a plain dict).
-    """
     if state.get("status") == "failed":
         return state
 
     try:
-        rag = LightRAG(
-            working_dir=WORKING_DIR,
-            llm_model_func=gemini_complete,
-            embedding_func=EmbeddingFunc(
-                embedding_dim=EMBEDDING_DIM,
-                max_token_size=8192,
-                func=gemini_embed,
-            ),
-        )
-        await rag.initialize_storages()
-
-        queries = [
-            "What are the specific regulatory compliance requirements and standards referenced?",
-            "What financial reporting thresholds, ratios, or benchmarks are mentioned?",
-            "What internal control weaknesses, risk factors, or audit criteria are identified?",
+        rule_queries = [
+            "regulatory compliance requirements and applicable standards for financial audit",
+            "financial reporting thresholds ratios capital adequacy benchmarks",
+            "internal control requirements risk assessment and audit materiality criteria",
         ]
 
-        results = []
-        for q in queries:
-            # FIX: use QueryParam object — plain dict was silently ignored
-            answer = await rag.aquery(q, param=QueryParam(mode="hybrid"))
-            results.append(f"[Query: {q}]\n{answer}")
+        rule_results = await asyncio.gather(
+            *[query_rules(q, n_results=4) for q in rule_queries],
+            return_exceptions=True,
+        )
 
-        combined = ("\n\n" + "─" * 60 + "\n\n").join(results)
+        rules_section = "## COMPLIANCE RULES & REGULATORY STANDARDS\n"
+        rules_section += "(Retrieved from pre-ingested rules knowledge base)\n\n"
+        for q, r in zip(rule_queries, rule_results):
+            if isinstance(r, Exception):
+                rules_section += f"[Query failed: {q}]\n"
+            else:
+                rules_section += f"### {q}\n{r}\n\n"
+
+        raw_excerpt = state["raw_text"][:8_000]
+        doc_section = (
+            "## DOCUMENT CONTENT (direct extract from uploaded financial PDF)\n\n"
+            + raw_excerpt
+        )
+
+        combined = rules_section + "\n" + ("=" * 60) + "\n\n" + doc_section
         return {"compliance_rules": combined, "status": "rules_fetched"}
 
     except Exception as exc:
@@ -164,45 +163,45 @@ async def librarian_node(state: AnalysisState) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Node 2 – Python Interpreter  (financial calculations)
+# Node 2 – Python Interpreter
 # ──────────────────────────────────────────────────────────────────────────────
 _CODE_GEN_SYSTEM = """\
-You are a financial data scientist specialising in audit analytics.
+You are a financial data scientist specialising in Indian company audit analytics.
 Write a self-contained Python script that:
-  1. Defines named variables for EVERY numerical figure extracted from the document.
-  2. Computes standard financial ratios (liquidity, profitability, leverage, coverage).
-  3. Calculates period-over-period changes when multiple reporting periods are present.
-  4. Flags figures that deviate from typical industry norms
-     (e.g. current ratio < 1, debt/equity > 3, negative operating cash flow).
-  5. Prints ALL results with clear, labelled output lines.
+  1. Scans the document text carefully for EVERY rupee / crore / lakh / percentage figure.
+  2. Assigns each found figure to a clearly named variable (e.g. revenue_fy25, ppe_gross).
+  3. Computes ALL of these ratios if data exists (print "N/A — not found" if missing):
+       current_ratio, debt_equity_ratio, net_profit_margin_pct,
+       return_on_assets_pct, interest_coverage, working_capital, dscr
+  4. Flags: current_ratio < 1, debt_equity > 3, negative operating cash flow.
+  5. For EVERY variable found, prints: print(f"Label: INR {{value:,.2f}} Cr")
+  6. If NO figures found, ALWAYS prints:
+       print("WARNING: No specific financial figures extracted from this document.")
 
-Constraints:
-- Use ONLY: built-in Python, `math`, `statistics`, and `np` (numpy).
-- Do NOT import anything else.
-- Output ONLY the raw Python code – no markdown fences, no explanation.
-- Keep the script under 100 lines to stay within output token limits.
+CRITICAL: Script MUST always print at least one line. Never zero output.
+Constraints: Only built-in Python, math, statistics, np (numpy). No other imports.
+Output ONLY raw Python code. No markdown. Under 120 lines.
 """
 
 _CODE_GEN_USER = """\
-Extract financial figures and compute audit metrics for the document below.
+Extract financial figures and compute audit metrics.
+CARO 2020 data fields to look for: {caro_fields}
 
-DOCUMENT TEXT (first 5 000 characters):
+DOCUMENT TEXT (first 6000 chars):
 {text}
 """
 
 _CODE_FIX_USER = """\
-The code below produced an error. Rewrite it to fix the problem.
+The code below had an error OR zero output. Rewrite to fix.
+The script MUST print at least one line — add a fallback print if no data found.
 
-ERROR:
-{error}
+ISSUE: {error}
 
 ORIGINAL CODE:
 {code}
 
-Output ONLY the corrected Python code – no markdown fences, no explanation.
-Keep the script under 100 lines.
+Output ONLY corrected Python. No fences. Under 120 lines.
 """
-
 
 def _strip_fences(code: str) -> str:
     lines = code.strip().splitlines()
@@ -212,63 +211,50 @@ def _strip_fences(code: str) -> str:
         lines = lines[:-1]
     return "\n".join(lines).strip()
 
-
 async def python_interpreter_node(state: AnalysisState) -> dict:
-    """
-    LLM code generation + sandboxed execution.
-    Uses gemini-2.5-flash (1 500 RPD free tier).
-    Retries on 503 via _invoke_with_retry before falling back to error state.
-    """
     if state.get("status") == "failed":
         return state
 
-    # gemini-2.5-flash: sufficient for code gen, generous free quota
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
-        temperature=0.0,
-        google_api_key=api_key,
-        max_output_tokens=2048,  # keep within free-tier output limits
+    user_msg = _CODE_GEN_USER.format(
+        caro_fields=_build_caro_data_fields()[:500],
+        text=state["raw_text"][:6_000],
     )
 
-    # ── Step 1: code generation (with retry) ──
-    user_msg = _CODE_GEN_USER.format(text=state["raw_text"][:5_000])
     try:
-        content = await _invoke_with_retry(llm, [
-            SystemMessage(content=_CODE_GEN_SYSTEM),
-            HumanMessage(content=user_msg),
+        content = await _invoke_with_retry([
+            {"role": "system", "content": _CODE_GEN_SYSTEM},
+            {"role": "user", "content": user_msg},
         ])
     except Exception as exc:
         return {
             "python_code":         "",
             "calculation_results": f"Code generation failed: {exc}",
-            "status":              "calculations_done",  # non-fatal — auditor continues
+            "status":              "calculations_done",
         }
 
-    code = _strip_fences(content)
-
-    # ── Step 2: first execution attempt ──
+    code   = _strip_fences(content)
     result = safe_python_executor(code)
 
-    # ── Step 3: one self-correction attempt on failure ──
-    if not result["success"]:
+    no_output = result["success"] and not result["output"].strip()
+    if not result["success"] or no_output:
+        issue = result["error"] if not result["success"] else "Code ran but produced ZERO printed output."
         try:
-            fix_content = await _invoke_with_retry(llm, [
-                SystemMessage(content=_CODE_GEN_SYSTEM),
-                HumanMessage(content=_CODE_FIX_USER.format(
-                    error=result["error"], code=code
-                )),
+            fix_content = await _invoke_with_retry([
+                {"role": "system", "content": _CODE_GEN_SYSTEM},
+                {"role": "user", "content": _CODE_FIX_USER.format(error=issue, code=code)},
             ])
             code   = _strip_fences(fix_content)
             result = safe_python_executor(code)
         except Exception as exc:
             result = {"success": False, "output": "", "error": str(exc)}
 
-    if result["success"]:
-        calc_output = result["output"] or "(code ran successfully but produced no printed output)"
+    if result["success"] and result["output"].strip():
+        calc_output = result["output"]
+    elif result["success"]:
+        calc_output = "WARNING: No financial figures could be extracted from this document section."
     else:
         calc_output = (
-            f"Calculation failed after self-correction attempt.\n"
-            f"Error: {result['error']}\n"
+            f"Calculation failed.\nError: {result['error']}\n"
             f"Partial output: {result['output']}"
         )
 
@@ -280,77 +266,76 @@ async def python_interpreter_node(state: AnalysisState) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Node 3 – Auditor  (gap analysis)
+# Node 3 – Auditor (CARO 2020 clause-by-clause)
 # ──────────────────────────────────────────────────────────────────────────────
 _AUDITOR_SYSTEM = """\
-You are a Senior Partner-level Chartered Accountant conducting a formal financial audit.
-You have:
-  (A) Compliance rules and regulatory requirements from the knowledge graph.
-  (B) Computed financial metrics from the Python analysis tool.
-  (C) The original document content.
+You are a Senior Statutory Auditor conducting a formal audit under the Companies
+(Auditor's Report) Order, 2020 (CARO 2020) and Indian Standards on Auditing
+(SA 700 / SA 705 / SA 706).
 
-Produce a structured gap analysis with these mandatory sections:
+You have been provided:
+  (A) Compliance rules from the regulatory knowledge base (CARO, SA standards)
+  (B) The financial document content (direct extract)
+  (C) Computed financial metrics from Python analysis
+  (D) The complete CARO 2020 checklist — all 21 clauses with audit questions
+
+YOUR TASK: Produce a structured CARO 2020 compliance audit report.
+
+PART 1 — CLAUSE-BY-CLAUSE ASSESSMENT
+For each Clause 01 through 21:
+  Clause XX: <Title>
+  Status: COMPLIANT / NON-COMPLIANT / INSUFFICIENT DATA / NOT APPLICABLE
+  Basis: <cite specific figure or text from document supporting this>
+
+PART 2 — FINDINGS SUMMARY
 
 ### CRITICAL FINDINGS  [severity: HIGH]
-Material misstatements, regulatory violations, or fraud risk indicators.
-Cite specific figures and applicable standards for each finding.
+Material misstatements or violations. Cite CARO clause + rupee figure.
 
 ### SIGNIFICANT FINDINGS  [severity: MEDIUM]
-Internal control weaknesses, disclosure deficiencies, or policy deviations.
+Control weaknesses, disclosure gaps. Cite clause.
 
 ### OBSERVATIONS  [severity: LOW]
-Best-practice gaps, minor procedural issues, or improvement opportunities.
+Best-practice gaps or improvement areas.
 
-### FINANCIAL ANOMALIES
-Ratios outside normal ranges, unexplained variances, or suspicious trends.
+### FINANCIAL HEALTH SUMMARY
+Ratios computed, flags raised, overall risk: Low / Moderate / High / Critical.
 
 ### POSITIVE OBSERVATIONS
-Areas of full compliance, robust controls, or noteworthy best practices.
+Areas of full compliance and strong practice.
 
-Be concise but specific. Cite numbers. Reference the applicable rule for every point.
-Keep total output under 1500 words to stay within free-tier token limits.
+Be specific. Cite rupee figures. Reference CARO clause numbers. Under 1800 words.
 """
 
 _AUDITOR_USER = """\
-COMPLIANCE RULES & REGULATORY REQUIREMENTS:
+(A) COMPLIANCE RULES FROM KNOWLEDGE BASE:
 {rules}
 
-COMPUTED FINANCIAL METRICS:
+(B) DOCUMENT CONTENT:
+{text}
+
+(C) COMPUTED FINANCIAL METRICS:
 {calculations}
 
-DOCUMENT CONTENT (first 6 000 characters):
-{text}
+(D) CARO 2020 FULL CHECKLIST:
+{caro_checklist}
 """
 
-
 async def auditor_node(state: AnalysisState) -> dict:
-    """
-    Gap analysis combining retrieved rules, computed metrics, and raw text.
-    Uses gemini-2.5-flash to preserve the 25 RPD gemini-2.5-pro free quota
-    for the report generation stage where deeper reasoning matters most.
-    """
     if state.get("status") == "failed":
         return state
 
-    # FIX: was gemini-2.5-pro (25 RPD free limit — exhausted quickly).
-    # gemini-2.5-flash handles gap analysis well within free tier.
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
-        temperature=0.1,
-        google_api_key=api_key,
-        max_output_tokens=3000,
-    )
-
     user_msg = _AUDITOR_USER.format(
         rules=state["compliance_rules"][:3_000],
+        text=state["raw_text"][:5_000],
         calculations=state["calculation_results"],
-        text=state["raw_text"][:6_000],
+        caro_checklist=_build_caro_checklist()[:4_000],
     )
 
     try:
-        content = await _invoke_with_retry(llm, [
-            SystemMessage(content=_AUDITOR_SYSTEM),
-            HumanMessage(content=user_msg),
+        content = await _invoke_with_retry([
+            {"role": "system", "content": _AUDITOR_SYSTEM},
+            {"role": "user", "content": user_msg},
         ])
     except Exception as exc:
         return {"status": "failed", "error": f"Auditor node failed: {exc}"}

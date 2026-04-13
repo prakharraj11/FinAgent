@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>AuditAI — Autonomous Financial Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&family=JetBrains+Mono:wght@400;500&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+/* ----- RESET + VARIABLES (improved visibility) ----- */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --balsamico:   #150C0C;
+  --burnt:       #34150F;
+  --honey:       #85431E;
+  --whiskey:     #D39858;
+  --champagne:   #EACEAA;
+  --bg:          #0e0807;
+  --surface:     #1c0f0c;
+  --surface2:    #251610;
+  --surface3:    #2e1b12;
+  --border:      #3d2015;
+  --border2:     #5a3020;
+  --text:        #EACEAA;
+  --text-dim:    #c4a882;
+  --muted:       #8a6a4a;
+  --accent:      #D39858;
+  --accent-dim:  #2a1a0a;
+  --accent-glow: rgba(211,152,88,0.12);
+  --gold:        #EACEAA;
+  --brand:       #D39858;
+  --green:       #a8c97f;
+  --red:         #d9735a;
+  --orange:      #c4813e;
+  --yellow:      #d4aa50;
+  --font-body:   'Jost', sans-serif;
+  --font-display:'Cormorant Garamond', serif;
+  --font-mono:   'JetBrains Mono', monospace;
+  --radius:      8px;
+  --sidebar-w:   290px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-body)}
+a{color:var(--accent);text-decoration:none}
+button{cursor:pointer;font-family:var(--font-body)}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;opacity:.03;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size:256px 256px;
+}
+
+.app{
+  display:flex;
+  height:100dvh;               /* dynamic viewport avoids mobile bar clipping */
+  overflow:hidden;
+}
+
+/* Sidebar (unchanged layout but scroll friendly) */
+.sidebar{
+  width:var(--sidebar-w);flex-shrink:0;background:var(--surface);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;
+  overflow:hidden;position:relative;
+}
+.sidebar::before{
+  content:'';position:absolute;top:-60px;left:-60px;width:220px;height:220px;
+  background:radial-gradient(circle, rgba(211,152,88,0.08) 0%, transparent 70%);
+  pointer-events:none;
+}
+.sidebar-logo{padding:24px 22px 18px;border-bottom:1px solid var(--border);position:relative}
+.logo-accent-bar{width:28px;height:3px;background:linear-gradient(90deg, var(--whiskey), var(--honey));border-radius:2px;margin-bottom:10px}
+.logo-wordmark{font-family:var(--font-display);font-size:26px;font-weight:700;color:var(--champagne);letter-spacing:1px;line-height:1}
+.logo-sub{font-size:9px;font-weight:500;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-top:5px;font-family:var(--font-body)}
+.sidebar-section{padding:18px 18px 6px;font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);font-weight:600;font-family:var(--font-body)}
+.sidebar-sessions{flex:1;overflow-y:auto;padding:0 10px 10px}
+.session-item{padding:10px 12px;border-radius:var(--radius);cursor:pointer;margin-bottom:3px;transition:background .15s;border:1px solid transparent}
+.session-item:hover{background:var(--surface2)}
+.session-item.active{background:var(--accent-dim);border-color:rgba(211,152,88,0.25)}
+.session-name{font-size:12px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.session-meta{font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--font-mono)}
+.stage-pill{display:inline-flex;align-items:center;gap:4px;font-size:9px;letter-spacing:1px;text-transform:uppercase;font-weight:700;padding:2px 8px;border-radius:20px;margin-top:5px;font-family:var(--font-body)}
+.stage-created  {background:rgba(255,255,255,.04);color:var(--muted)}
+.stage-ingested {background:rgba(211,152,88,.1);color:var(--whiskey)}
+.stage-analyzed {background:rgba(168,201,127,.1);color:var(--green)}
+.stage-done     {background:rgba(212,170,80,.1);color:var(--yellow)}
+.stage-error    {background:rgba(217,115,90,.1);color:var(--red)}
+.stage-analyzing,.stage-reporting,.stage-ingesting{background:rgba(196,129,62,.08);color:var(--orange)}
+.sidebar-new-btn{
+  margin:14px 12px 6px;padding:11px;border-radius:var(--radius);background:transparent;
+  border:1px solid var(--border2);color:var(--whiskey);font-size:13px;font-weight:500;
+  letter-spacing:.5px;transition:all .2s;position:relative;overflow:hidden;
+}
+.sidebar-new-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg, rgba(211,152,88,.08), transparent);opacity:0;transition:opacity .2s}
+.sidebar-new-btn:hover{border-color:var(--whiskey);background:rgba(211,152,88,.06)}
+.sidebar-status{margin:6px 12px 14px;padding:11px 14px;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border);font-size:11px}
+.status-row{display:flex;justify-content:space-between;margin-bottom:4px}
+.status-label{color:var(--muted);font-size:10px;letter-spacing:.5px;text-transform:uppercase}
+.status-val{color:var(--text-dim);font-family:var(--font-mono);font-size:10px}
+.status-ok{color:var(--green)}
+.status-warn{color:var(--orange)}
+
+/* MAIN CONTAINER – ensures no clipping of buttons/content */
+.main{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  min-height:0;            /* critical: flex child can shrink below content height */
+}
+
+.chat-header{
+  padding:0 28px;height:64px;border-bottom:1px solid var(--border);
+  background:var(--surface);display:flex;align-items:center;gap:16px;position:relative;
+  flex-shrink:0;
+}
+.chat-header::after{content:'';position:absolute;bottom:-1px;left:28px;width:48px;height:2px;background:linear-gradient(90deg, var(--whiskey), transparent);border-radius:1px}
+.header-icon{width:38px;height:38px;border-radius:10px;background:var(--accent-dim);border:1px solid rgba(211,152,88,0.2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.chat-header-title{font-family:var(--font-display);font-size:19px;font-weight:600;color:var(--champagne);letter-spacing:.3px;line-height:1.1}
+.chat-header-sub{font-size:11px;color:var(--muted);margin-top:1px;letter-spacing:.3px}
+.header-session-badge{margin-left:auto;font-family:var(--font-mono);font-size:10px;color:var(--muted);background:var(--surface2);padding:4px 12px;border-radius:20px;border:1px solid var(--border);letter-spacing:.5px}
+
+/* CHAT MESSAGES – improved scrolling + bottom spacing */
+.chat-messages{
+  flex:1;
+  overflow-y:auto;
+  padding:28px 28px 48px 28px;     /* extra bottom padding ensures last card is fully visible */
+  display:flex;
+  flex-direction:column;
+  gap:18px;
+  background:var(--bg);
+  min-height:0;
+}
+
+/* welcome screen stays centered */
+.welcome{margin:auto;text-align:center;max-width:500px;animation:fadeUp .6s ease both}
+.welcome-icon{width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg, var(--surface3), var(--surface2));border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 20px;box-shadow:0 8px 32px rgba(0,0,0,.4), inset 0 1px 0 rgba(211,152,88,.1)}
+.welcome-eyebrow{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--whiskey);font-weight:500;margin-bottom:10px}
+.welcome-title{font-family:var(--font-display);font-size:34px;font-weight:600;color:var(--champagne);letter-spacing:-.5px;margin-bottom:10px;line-height:1.15}
+.welcome-sub{font-size:13px;color:var(--muted);line-height:1.75;margin-bottom:30px;font-weight:300}
+.welcome-upload-zone{border:1px dashed var(--border2);border-radius:14px;padding:36px 28px;cursor:pointer;transition:all .25s;background:var(--surface);position:relative;overflow:hidden}
+.welcome-upload-zone:hover{border-color:var(--whiskey);background:var(--surface2);box-shadow:0 0 40px rgba(211,152,88,.07)}
+.upload-icon{font-size:28px;margin-bottom:10px;opacity:.7}
+.upload-label{font-size:14px;font-weight:500;color:var(--text-dim);margin-bottom:5px}
+.upload-hint{font-size:11px;color:var(--muted)}
+#welcome-file-input{display:none}
+
+/* bubbles — better readability & button visibility */
+.message{display:flex;gap:12px;animation:fadeUp .3s ease both}
+.message.user{flex-direction:row-reverse}
+.avatar{width:32px;height:32px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px}
+.avatar.agent{background:linear-gradient(135deg, var(--surface3), var(--surface2));border:1px solid var(--border2)}
+.avatar.user-av{background:var(--surface2);border:1px solid var(--border)}
+.bubble{max-width:72%;padding:12px 16px;border-radius:14px;font-size:13.5px;line-height:1.7;font-weight:300}
+.bubble.agent{background:var(--surface);border:1px solid var(--border);border-top-left-radius:3px;color:var(--text-dim)}
+.bubble.user{background:linear-gradient(135deg, var(--accent-dim), rgba(52,21,15,0.8));border:1px solid rgba(211,152,88,.2);color:var(--text-dim);border-top-right-radius:3px;text-align:right}
+
+/* progress */
+.progress-msg{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:12px;color:var(--muted);width:fit-content}
+.progress-spinner{width:14px;height:14px;border:1.5px solid var(--border2);border-top-color:var(--whiskey);border-radius:50%;animation:spin .8s linear infinite}
+.progress-check{color:var(--green);font-size:13px}
+
+/* ACTION CARD – fully visible, responsive */
+.action-card{
+  max-width:76%;
+  padding:20px 24px;
+  border-radius:14px;
+  background:var(--surface);
+  border:1px solid var(--border2);
+  border-top-left-radius:3px;
+  animation:fadeUp .4s ease both;
+  position:relative;
+  overflow:visible;
+}
+.action-card-title{font-family:var(--font-display);font-size:19px;font-weight:600;color:var(--champagne);margin-bottom:8px}
+.action-card-sub{font-size:13px;color:var(--muted);margin-bottom:20px;line-height:1.6}
+.action-btns{display:flex;gap:12px;flex-wrap:wrap;margin-top:4px}
+.btn-primary{
+  padding:10px 26px;border-radius:7px;border:none;font-size:12px;font-weight:600;
+  background:linear-gradient(135deg, var(--whiskey), var(--honey));color:#1a0a05;
+  letter-spacing:.5px;text-transform:uppercase;transition:all .2s;
+  box-shadow:0 4px 16px rgba(211,152,88,.2)
+}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(211,152,88,.35)}
+.btn-primary:disabled{opacity:.35;cursor:not-allowed}
+.btn-secondary{
+  padding:10px 20px;border-radius:7px;font-size:12px;font-weight:500;
+  background:transparent;border:1px solid var(--border2);color:var(--muted);
+  transition:all .2s;
+}
+.btn-secondary:hover{border-color:var(--text-dim);color:var(--text-dim)}
+
+/* findings card */
+.findings-card{
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  overflow:hidden;
+  margin-top:12px;
+  width:100%;
+}
+.findings-header{
+  padding:12px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  cursor:pointer;
+  transition:background .15s;
+}
+.findings-header-left{display:flex;align-items:center;gap:10px;font-size:12px;font-weight:600;color:var(--text-dim);flex-wrap:wrap}
+.severity-chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.8px;text-transform:uppercase}
+.chip-high{background:rgba(217,115,90,.12);color:var(--red);border:1px solid rgba(217,115,90,.2)}
+.chip-medium{background:rgba(196,129,62,.12);color:var(--orange);border:1px solid rgba(196,129,62,.2)}
+.chip-low{background:rgba(212,170,80,.12);color:var(--yellow);border:1px solid rgba(212,170,80,.2)}
+.findings-body{
+  padding:14px 16px;
+  font-size:11.5px;
+  color:var(--muted);
+  font-family:var(--font-mono);
+  line-height:1.8;
+  max-height:280px;        /* more space to see findings */
+  overflow-y:auto;
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+.findings-toggle{font-size:10px;color:var(--whiskey);font-weight:600}
+
+/* REPORT CARD – buttons always accessible */
+.report-card{
+  max-width:92%;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:14px;
+  overflow:visible;
+  animation:fadeUp .5s ease both;
+  box-shadow:0 16px 48px rgba(0,0,0,.3);
+  margin-bottom:8px;
+}
+.report-card-header{
+  padding:16px 22px;
+  background:var(--surface2);
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  flex-wrap:wrap;
+}
+.report-card-title{font-family:var(--font-display);font-size:18px;color:var(--champagne);font-weight:600}
+.report-card-meta{font-size:10px;color:var(--muted);font-family:var(--font-mono);margin-top:4px}
+.report-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn-icon{
+  padding:6px 14px;
+  border-radius:6px;
+  font-size:11px;
+  font-weight:500;
+  background:var(--surface);
+  border:1px solid var(--border2);
+  color:var(--muted);
+  transition:all .15s;
+}
+.btn-icon:hover{border-color:var(--whiskey);color:var(--whiskey)}
+.btn-icon-pdf{
+  padding:6px 14px;
+  border-radius:6px;
+  font-size:11px;
+  font-weight:600;
+  background:linear-gradient(135deg, rgba(211,152,88,.18), rgba(133,67,30,.18));
+  border:1px solid rgba(211,152,88,.5);
+  color:var(--whiskey);
+  transition:all .15s;
+}
+.btn-icon-pdf:hover{
+  background:linear-gradient(135deg, rgba(211,152,88,.3), rgba(133,67,30,.25));
+  border-color:var(--whiskey);
+  box-shadow:0 0 14px rgba(211,152,88,.2);
+}
+.btn-icon-pdf:disabled{opacity:.4;cursor:wait}
+.pdf-spin{
+  display:inline-block;width:10px;height:10px;
+  border:1.5px solid rgba(211,152,88,.3);
+  border-top-color:var(--whiskey);
+  border-radius:50%;
+  animation:spin .7s linear infinite;
+  vertical-align:middle;margin-right:5px;
+}
+.report-body{
+  padding:22px 26px;
+  max-height:540px;
+  overflow-y:auto;
+  font-size:13px;
+  line-height:1.85;
+  color:var(--text-dim);
+  font-weight:300;
+}
+/* report markdown styling */
+.report-body h1{font-family:var(--font-display);font-size:22px;color:var(--champagne);margin:22px 0 10px;border-bottom:1px solid var(--border);padding-bottom:8px}
+.report-body h2{font-size:17px;color:var(--whiskey);margin:20px 0 7px;font-style:italic}
+.report-body p{margin-bottom:10px;color:var(--muted)}
+.report-body strong{color:var(--text-dim)}
+.report-body table{width:100%;border-collapse:collapse;margin:14px 0;font-size:12px}
+.report-body th{background:var(--surface2);padding:8px 12px;border-bottom:1px solid var(--border2);color:var(--muted);text-transform:uppercase;font-size:9px}
+.report-body td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text-dim)}
+.report-body code{font-family:var(--font-mono);background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:11px;color:var(--green)}
+.report-body pre{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;overflow-x:auto}
+.report-body blockquote{border-left:2px solid var(--whiskey);padding-left:14px;color:var(--muted);font-style:italic;margin:12px 0}
+
+/* bottom bar */
+.chat-input-area{
+  padding:14px 20px 20px;
+  border-top:1px solid var(--border);
+  background:var(--surface);
+  flex-shrink:0;
+}
+.upload-bar{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:10px 16px;
+  cursor:pointer;
+  transition:all .2s;
+}
+.upload-bar:hover{border-color:var(--border2)}
+.upload-bar-text{font-size:12.5px;color:var(--muted);flex:1}
+.upload-bar-text span{color:var(--whiskey);font-weight:500}
+.api-url-row{margin-top:10px;display:flex;align-items:center;gap:10px}
+.api-url-input{
+  flex:1;
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:7px;
+  padding:6px 10px;
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--muted);
+}
+.api-url-label{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px}
+
+/* responsive: ensure all buttons & outputs visible on narrow screens */
+@media (max-width: 780px){
+  .sidebar{display:none}
+  .bubble{max-width:94%}
+  .action-card{max-width:96%;padding:16px 18px}
+  .report-card{max-width:98%}
+  .action-btns{flex-direction:column;align-items:flex-start;gap:10px}
+  .btn-primary,.btn-secondary{width:100%;text-align:center}
+  .report-actions{width:100%;justify-content:flex-start}
+  .chat-messages{padding:18px 16px 40px 16px}
+}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo"><div class="logo-accent-bar"></div><div class="logo-wordmark">AuditAI</div><div class="logo-sub">Autonomous Financial Audit</div></div>
+    <button class="sidebar-new-btn" onclick="startNewSession()">＋ &nbsp;New Audit Session</button>
+    <div class="sidebar-status" id="sidebar-status">
+      <div class="status-row"><span class="status-label">API</span><span class="status-val" id="api-status">—</span></div>
+      <div class="status-row"><span class="status-label">Rules KB</span><span class="status-val" id="rules-status">—</span></div>
+    </div>
+    <div class="sidebar-section">Recent Sessions</div>
+    <div class="sidebar-sessions" id="session-list"><div style="padding:14px 12px;font-size:12px;color:var(--muted)">No sessions yet</div></div>
+  </aside>
+
+  <div class="main">
+    <header class="chat-header">
+      <div class="header-icon">📊</div>
+      <div class="chat-header-text"><div class="chat-header-title">Financial Audit Assistant</div><div class="chat-header-sub" id="header-sub">Upload a financial PDF to begin</div></div>
+      <div class="header-session-badge" id="header-session-id" style="display:none"></div>
+    </header>
+
+    <div class="chat-messages" id="chat-messages">
+      <div class="welcome" id="welcome-screen">
+        <div class="welcome-icon">📊</div>
+        <div class="welcome-eyebrow">CARO 2020 · ISA 700/705/706</div>
+        <div class="welcome-title">Audit any<br><em>financial statement</em></div>
+        <div class="welcome-sub">Upload a PDF — clause-by-clause CARO 2020 compliance, ratios, and publishable audit report. You confirm each step.</div>
+        <div class="welcome-upload-zone" id="welcome-drop-zone" onclick="document.getElementById('welcome-file-input').click()" ondragover="onDragOver(event)" ondrop="onDrop(event,'welcome')" ondragleave="onDragLeave(event)">
+          <div class="upload-icon">📎</div><div class="upload-label">Drop your financial PDF here</div><div class="upload-hint">or click to browse &nbsp;·&nbsp; <span>PDF only</span></div>
+        </div>
+        <input type="file" id="welcome-file-input" accept=".pdf" onchange="onFileSelect(event,'welcome')"/>
+      </div>
+    </div>
+
+    <div class="chat-input-area" id="bottom-bar" style="display:none">
+      <div class="upload-bar" onclick="document.getElementById('main-file-input').click()" ondragover="onDragOver(event)" ondrop="onDrop(event,'main')" ondragleave="onDragLeave(event)">
+        <span class="upload-bar-icon">📎</span><span class="upload-bar-text">Drop a new PDF, or <span>click to upload</span> a different document</span><span class="upload-bar-arrow">↑</span>
+      </div>
+      <input type="file" id="main-file-input" accept=".pdf" onchange="onFileSelect(event,'main')"/>
+      <div class="api-url-row"><span class="api-url-label">API</span><input class="api-url-input" id="api-url-input" value="http://localhost:8000" oninput="API_BASE=this.value.replace(/\/$/,'')"/></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let API_BASE = 'http://127.0.0.1:8000';
+let currentSessionId = null;
+let eventSource = null;
+let analysisData = null;
+let reportId = null;
+
+window.addEventListener('DOMContentLoaded', async () => { await fetchServerStatus(); await loadSessionList(); document.getElementById('api-url-input').value = API_BASE; document.getElementById('api-url-input').oninput = function() { API_BASE = this.value.replace(/\/$/, ''); }; });
+
+async function fetchServerStatus() { try { const r = await fetch(`${API_BASE}/`); const d = await r.json(); document.getElementById('api-status').innerHTML = '● Online'; document.getElementById('api-status').className = 'status-val status-ok'; document.getElementById('rules-status').innerHTML = d.rules_kb?.chunks ? `${d.rules_kb.chunks} chunks` : 'Empty'; document.getElementById('rules-status').className = `status-val ${d.rules_kb?.chunks ? 'status-ok' : 'status-warn'}`; } catch { document.getElementById('api-status').innerHTML = '● Offline'; document.getElementById('api-status').className = 'status-val status-warn'; } }
+async function loadSessionList() { try { const r = await fetch(`${API_BASE}/sessions/`); const d = await r.json(); const list = document.getElementById('session-list'); if (!d.sessions?.length) { list.innerHTML = '<div style="padding:14px 12px;font-size:12px;color:var(--muted)">No sessions yet</div>'; return; } list.innerHTML = d.sessions.map(s => `<div class="session-item ${s.id === currentSessionId ? 'active' : ''}" onclick="loadSession('${s.id}')"><div class="session-name">${esc(s.file_name || 'Untitled')}</div><div class="session-meta">${relativeTime(s.created_at)}</div><span class="stage-pill stage-${s.stage}">${s.stage}</span></div>`).join(''); } catch {} }
+async function loadSession(sid) { try { const r = await fetch(`${API_BASE}/session/${sid}/status`); const session = await r.json(); currentSessionId = sid; switchToChatView(session.file_name || 'Document'); clearChat(); if (session.stage === 'ingested') { appendAgentBubble(`✅ **${esc(session.file_name)}** was already ingested. Ready for CARO 2020 analysis.`); appendAnalysisActionCard(); } else if (session.stage === 'analyzed') { appendAgentBubble(`📊 Analysis of **${esc(session.file_name)}** is complete.`); appendReportActionCard(); } else if (session.stage === 'done' && session.report_id) { reportId = session.report_id; appendAgentBubble(`🎉 Audit report for **${esc(session.file_name)}** is ready.`); const rep = await fetch(`${API_BASE}/report/${session.report_id}/full`); const rd = await rep.json(); const pdfExists = await checkPdfExists(session.report_id); appendReportCard(rd.final_report, session.report_id, rd.audit_opinion, pdfExists); } else if (session.stage === 'error') { appendAgentBubble(`⚠️ Session error: ${esc(session.error || 'Unknown')}`); } loadSessionList(); openSSEStream(sid); } catch(e){ console.error(e); } }
+async function checkPdfExists(repId) { try { const r = await fetch(`${API_BASE}/report/${repId}/pdf`, { method: 'HEAD' }); return r.ok; } catch { return false; } }
+function startNewSession() { if(eventSource) eventSource.close(); currentSessionId = null; analysisData = null; reportId = null; document.getElementById('bottom-bar').style.display = 'none'; document.getElementById('header-session-id').style.display = 'none'; document.getElementById('header-sub').textContent = 'Upload a financial PDF to begin'; clearChat(true); }
+function onDragOver(e){ e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function onDragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
+function onDrop(e,src){ e.preventDefault(); e.currentTarget.classList.remove('drag-over'); const f = e.dataTransfer.files[0]; if(f && f.name.endsWith('.pdf')) uploadFile(f); }
+function onFileSelect(e,src){ const f = e.target.files[0]; if(f) uploadFile(f); e.target.value = ''; }
+async function uploadFile(file){ switchToChatView(file.name); appendUserBubble(`📎 Uploading **${esc(file.name)}** (${(file.size/1024).toFixed(0)} KB)…`); const thinking = appendThinking(); const fd = new FormData(); fd.append('file', file); try { const r = await fetch(`${API_BASE}/session/start`, {method:'POST', body:fd}); if(!r.ok) throw new Error((await r.json()).detail || r.statusText); const d = await r.json(); currentSessionId = d.session_id; thinking.remove(); document.getElementById('header-session-id').textContent = `Session ${d.session_id}`; document.getElementById('header-session-id').style.display = 'block'; openSSEStream(d.session_id); loadSessionList(); } catch(err) { thinking.remove(); appendAgentBubble(`❌ Upload failed: ${esc(String(err))}`); } }
+function openSSEStream(sid){ if(eventSource) eventSource.close(); eventSource = new EventSource(`${API_BASE}/session/${sid}/stream`); eventSource.onmessage = (e) => { handleSSEEvent(JSON.parse(e.data)); }; eventSource.onerror = () => { setTimeout(() => pollSessionStatus(sid), 3000); }; }
+function handleSSEEvent(ev){ switch(ev.type){
+  case 'progress': appendProgressStep(ev.message, false); break;
+  case 'ingestion_complete': markLastProgressDone(); appendAgentBubble(`✅ Parsed **${esc(ev.file_name)}** (${ev.text_length?.toLocaleString() || '?'} chars).\n\nRun **CARO 2020** clause-by-clause analysis?`); appendAnalysisActionCard(); loadSessionList(); break;
+  case 'analysis_complete': markLastProgressDone(); analysisData = ev; appendAnalysisResult(ev); appendReportActionCard(); loadSessionList(); break;
+  case 'report_complete': markLastProgressDone(); reportId = ev.report_id; appendAgentBubble(`🎉 Independent Auditor's Report ready.\n**Opinion:** ${esc(ev.audit_opinion || 'Qualified')}`); appendReportCard(ev.final_report, ev.report_id, ev.audit_opinion, ev.pdf_available === true); loadSessionList(); if(eventSource) eventSource.close(); break;
+  case 'error': markLastProgressDone(); appendAgentBubble(`⚠️ ${esc(ev.message)}`); loadSessionList(); break;
+  case 'stream_end': if(eventSource) eventSource.close(); break;
+}}
+async function pollSessionStatus(sid){ if(sid !== currentSessionId) return; try { const r = await fetch(`${API_BASE}/session/${sid}/status`); const s = await r.json(); if(s.stage === 'done' && s.report_id && !reportId) await loadSession(sid); } catch {} }
+async function triggerAnalysis(){ disableActionCard(); appendUserBubble('✅ Yes — run CARO 2020 analysis'); try { const r = await fetch(`${API_BASE}/session/${currentSessionId}/analyze`, {method:'POST'}); if(!r.ok) throw new Error((await r.json()).detail); } catch(err) { appendAgentBubble(`❌ Analysis start failed: ${esc(String(err))}`); } }
+async function triggerReport(){ disableActionCard(); appendUserBubble('📝 Yes — generate audit report'); try { const r = await fetch(`${API_BASE}/session/${currentSessionId}/report`, {method:'POST'}); if(!r.ok) throw new Error((await r.json()).detail); } catch(err) { appendAgentBubble(`❌ Report start failed: ${esc(String(err))}`); } }
+function clearChat(keepWelcome=false){ const msgs = document.getElementById('chat-messages'); if(keepWelcome){ msgs.innerHTML = `<div class="welcome" id="welcome-screen">...</div>`.replace('...',`<div class="welcome-icon">📊</div><div class="welcome-eyebrow">CARO 2020 · ISA 700/705/706</div><div class="welcome-title">Audit any<br><em>financial statement</em></div><div class="welcome-sub">Upload a PDF — clause-by-clause CARO 2020 compliance, ratios, and publishable audit report. You confirm each step.</div><div class="welcome-upload-zone" id="welcome-drop-zone" onclick="document.getElementById('welcome-file-input').click()" ondragover="onDragOver(event)" ondrop="onDrop(event,'welcome')" ondragleave="onDragLeave(event)"><div class="upload-icon">📎</div><div class="upload-label">Drop your financial PDF here</div><div class="upload-hint">or click to browse &nbsp;·&nbsp; <span>PDF only</span></div></div><input type="file" id="welcome-file-input" accept=".pdf" onchange="onFileSelect(event,'welcome')"/>`); } else { msgs.innerHTML = ''; } }
+function switchToChatView(fileName){ document.getElementById('welcome-screen')?.remove(); document.getElementById('bottom-bar').style.display = 'block'; document.getElementById('header-sub').textContent = fileName; scrollBottom(); }
+function scrollBottom(){ const c = document.getElementById('chat-messages'); c.scrollTo({top:c.scrollHeight, behavior:'smooth'}); }
+function appendAgentBubble(mdText){ const wrap = document.createElement('div'); wrap.className = 'message'; wrap.innerHTML = `<div class="avatar agent">🤖</div><div class="bubble agent">${marked.parse(mdText)}</div>`; document.getElementById('chat-messages').appendChild(wrap); scrollBottom(); return wrap; }
+function appendUserBubble(mdText){ const wrap = document.createElement('div'); wrap.className = 'message user'; wrap.innerHTML = `<div class="avatar user-av">👤</div><div class="bubble user">${marked.parse(mdText)}</div>`; document.getElementById('chat-messages').appendChild(wrap); scrollBottom(); return wrap; }
+function appendThinking(){ const wrap = document.createElement('div'); wrap.className = 'message'; wrap.innerHTML = `<div class="avatar agent">🤖</div><div class="bubble agent"><div class="thinking"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div></div>`; document.getElementById('chat-messages').appendChild(wrap); scrollBottom(); return wrap; }
+let _lastProgressEl = null;
+function appendProgressStep(msg, done=false){ const el = document.createElement('div'); el.className = 'progress-msg'; el.innerHTML = done ? `<span class="progress-check">✓</span><span>${esc(msg)}</span>` : `<div class="progress-spinner"></div><span>${esc(msg)}</span>`; document.getElementById('chat-messages').appendChild(el); _lastProgressEl = el; scrollBottom(); return el; }
+function markLastProgressDone(){ if(_lastProgressEl){ const text = _lastProgressEl.querySelector('span')?.textContent || ''; _lastProgressEl.innerHTML = `<span class="progress-check">✓</span><span>${esc(text)}</span>`; _lastProgressEl = null; } }
+function appendAnalysisActionCard(){ const el = document.createElement('div'); el.className = 'action-card'; el.id = 'current-action-card'; el.innerHTML = `<div class="action-card-title">Run CARO 2020 Compliance Analysis?</div><div class="action-card-sub">Clause-by-clause assessment, ratio computation, and compliance mapping. Typically 1–3 min.</div><div class="action-btns"><button class="btn-primary" onclick="triggerAnalysis()">Run Analysis →</button><button class="btn-secondary" onclick="startNewSession()">Upload different file</button></div>`; document.getElementById('chat-messages').appendChild(el); scrollBottom(); }
+function appendReportActionCard(){ const el = document.createElement('div'); el.className = 'action-card'; el.id = 'current-action-card'; el.innerHTML = `<div class="action-card-title">Generate Independent Auditor's Report?</div><div class="action-card-sub">ISA 700/705/706 & CARO 2020 compliant report with PDF generation.</div><div class="action-btns"><button class="btn-primary" onclick="triggerReport()">Generate Report →</button><button class="btn-secondary" onclick="startNewSession()">Start over</button></div>`; document.getElementById('chat-messages').appendChild(el); scrollBottom(); }
+function appendAnalysisResult(ev){ const el = document.createElement('div'); el.className = 'message'; el.innerHTML = `<div class="avatar agent">🤖</div><div style="flex:1;max-width:78%"><div class="bubble agent" style="border-bottom-left-radius:4px">${marked.parse('📊 **CARO 2020 analysis complete.** Summary:')}</div><div class="findings-card"><div class="findings-header" onclick="toggleFindings(this)"><div class="findings-header-left">🔍 Audit Findings <div class="severity-chips"><span class="chip chip-high">HIGH ${ev.high_count||0}</span><span class="chip chip-medium">MED ${ev.medium_count||0}</span><span class="chip chip-low">LOW ${ev.low_count||0}</span></div></div><span class="findings-toggle">Show ▾</span></div><div class="findings-body" style="display:none">${esc(ev.findings_preview||'')}</div></div></div>`; document.getElementById('chat-messages').appendChild(el); scrollBottom(); }
+function toggleFindings(header){ const body = header.nextElementSibling; const toggle = header.querySelector('.findings-toggle'); if(body.style.display === 'none'){ body.style.display = 'block'; toggle.textContent = 'Hide ▴'; } else { body.style.display = 'none'; toggle.textContent = 'Show ▾'; } }
+function appendReportCard(reportMd, repId, opinion, pdfAvailable){ const el = document.createElement('div'); el.className = 'report-card'; const pdfBtn = pdfAvailable ? `<button class="btn-icon-pdf" onclick="downloadPDF('${esc(repId)}', this)">⬇ PDF</button>` : `<button class="btn-icon-pdf" id="pdf-btn-${esc(repId)}" onclick="downloadPDF('${esc(repId)}', this)" style="opacity:.65">⬇ PDF</button>`; el.innerHTML = `<div class="report-card-header"><div><div class="report-card-title">Independent Auditor's Report</div><div class="report-card-meta">ID: ${esc(repId)} &nbsp;·&nbsp; Opinion: ${esc(opinion||'—')}</div></div><div class="report-actions"><button class="btn-icon" onclick="copyReport(this)">⎘ Copy</button><button class="btn-icon" onclick="downloadMarkdown('${esc(repId)}')">↓ MD</button>${pdfBtn}</div></div><div class="report-body">${marked.parse(reportMd||'*(Report content unavailable)*')}</div>`; document.getElementById('chat-messages').appendChild(el); scrollBottom(); }
+async function downloadPDF(repId, btn){ const origHtml = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<span class="pdf-spin"></span>Generating…'; try { const r = await fetch(`${API_BASE}/report/${repId}/pdf`); if(!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || `HTTP ${r.status}`); const blob = await r.blob(); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `audit_report_${repId}.pdf`; a.click(); URL.revokeObjectURL(a.href); btn.innerHTML = '✓ Downloaded'; setTimeout(()=>{ btn.innerHTML = origHtml; btn.disabled = false; }, 2000); } catch(err){ btn.innerHTML = '✗ Failed'; btn.style.color = 'var(--red)'; setTimeout(()=>{ btn.innerHTML = origHtml; btn.style.color = ''; btn.disabled = false; }, 2500); } }
+async function downloadMarkdown(repId){ try { const r = await fetch(`${API_BASE}/report/${repId}`); const text = await r.text(); const blob = new Blob([text], {type:'text/markdown'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `audit_report_${repId}.md`; a.click(); } catch { alert('Download failed'); } }
+function copyReport(btn){ const card = btn.closest('.report-card'); const body = card?.querySelector('.report-body'); if(!body) return; const range = document.createRange(); range.selectNodeContents(body); const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); document.execCommand('copy'); sel.removeAllRanges(); btn.textContent = '✓ Copied'; setTimeout(()=> btn.textContent = '⎘ Copy', 1800); }
+function disableActionCard(){ const card = document.getElementById('current-action-card'); if(card){ card.querySelectorAll('button').forEach(b=>b.disabled=true); card.id=''; } }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function relativeTime(iso){ if(!iso) return ''; const diff = Date.now() - new Date(iso).getTime(); const m = Math.floor(diff/60000); if(m<1) return 'Just now'; if(m<60) return `${m}m ago`; const h = Math.floor(m/60); if(h<24) return `${h}h ago`; return `${Math.floor(h/24)}d ago`; }
+marked.setOptions({ breaks: true, gfm: true });
+</script>
+</body>
+</html>
