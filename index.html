@@ -1,900 +1,857 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>AuditAI — Autonomous Financial Audit</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;0,600;1,300&family=JetBrains+Mono:wght@400;500&family=Mulish:wght@300;400;500;600&display=swap" rel="stylesheet"/>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<style>
-/* ── Reset + Variables ─────────────────────────────────────────────────── */
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:          #0b0f1a;
-  --surface:     #111827;
-  --surface2:    #1a2235;
-  --border:      #1f2d45;
-  --border2:     #2a3a55;
-  --text:        #e2eaf7;
-  --muted:       #7a8ba6;
-  --accent:      #38bdf8;    /* sky blue — agent */
-  --accent-dim:  #0c2a3e;
-  --gold:        #f0c040;    /* amber — headings/brand */
-  --green:       #34d399;    /* compliant */
-  --red:         #f87171;    /* high severity */
-  --orange:      #fb923c;    /* medium */
-  --yellow:      #facc15;    /* low */
-  --font-body:   'Mulish', sans-serif;
-  --font-display:'Fraunces', serif;
-  --font-mono:   'JetBrains Mono', monospace;
-  --radius:      10px;
-  --sidebar-w:   280px;
-}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-body)}
-a{color:var(--accent);text-decoration:none}
-button{cursor:pointer;font-family:var(--font-body)}
-::-webkit-scrollbar{width:6px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FinAudit AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* ── Layout ─────────────────────────────────────────────────────────────── */
-.app{display:flex;height:100vh;overflow:hidden}
+    :root {
+      --bg:       #070b12;
+      --bg2:      #0c1220;
+      --bg3:      #111826;
+      --bg4:      #172030;
+      --border:   #1a2438;
+      --border2:  #223050;
+      --text:     #dde5f0;
+      --text2:    #7a90ad;
+      --text3:    #4a5a6e;
+      --amber:    #e0971a;
+      --amber2:   #c47c0e;
+      --amber-bg: #1a1005;
+      --green:    #27c96e;
+      --green-bg: #061510;
+      --red:      #e84040;
+      --red-bg:   #150505;
+      --blue:     #5b9cf6;
+      --blue-bg:  #050f20;
+      --mono:     'JetBrains Mono', monospace;
+      --sans:     'Sora', sans-serif;
+      --r:        4px;
+    }
 
-/* ── Sidebar ─────────────────────────────────────────────────────────────── */
-.sidebar{
-  width:var(--sidebar-w);flex-shrink:0;
-  background:var(--surface);
-  border-right:1px solid var(--border);
-  display:flex;flex-direction:column;
-  overflow:hidden;
-}
-.sidebar-logo{
-  padding:20px 20px 16px;
-  border-bottom:1px solid var(--border);
-}
-.logo-wordmark{
-  font-family:var(--font-display);font-size:22px;font-weight:600;
-  color:var(--gold);letter-spacing:-0.5px;
-}
-.logo-sub{
-  font-size:10px;font-weight:500;letter-spacing:2px;text-transform:uppercase;
-  color:var(--muted);margin-top:2px;
-}
-.sidebar-section{padding:14px 16px 8px;font-size:10px;letter-spacing:1.5px;
-  text-transform:uppercase;color:var(--muted);font-weight:600}
-.sidebar-sessions{flex:1;overflow-y:auto;padding:0 8px 8px}
-.session-item{
-  padding:10px 12px;border-radius:var(--radius);cursor:pointer;
-  margin-bottom:2px;transition:background .15s;
-}
-.session-item:hover{background:var(--surface2)}
-.session-item.active{background:var(--accent-dim);border:1px solid var(--accent)30}
-.session-name{font-size:12px;font-weight:600;color:var(--text);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.session-meta{font-size:11px;color:var(--muted);margin-top:2px}
-.stage-pill{
-  display:inline-flex;align-items:center;gap:4px;
-  font-size:9px;letter-spacing:.8px;text-transform:uppercase;font-weight:700;
-  padding:2px 7px;border-radius:20px;margin-top:4px;
-}
-.stage-created  {background:#1a1a2e;color:#7c88a0}
-.stage-ingested {background:#0c2a3e;color:var(--accent)}
-.stage-analyzed {background:#0a2e20;color:var(--green)}
-.stage-done     {background:#1a2800;color:var(--yellow)}
-.stage-error    {background:#2e0a0a;color:var(--red)}
-.stage-analyzing,.stage-reporting,.stage-ingesting{background:#1e1a2e;color:#a78bfa}
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
 
-.sidebar-new-btn{
-  margin:12px;padding:10px;border-radius:var(--radius);
-  background:var(--accent-dim);border:1px solid var(--accent)40;
-  color:var(--accent);font-size:13px;font-weight:600;
-  transition:all .2s;
-}
-.sidebar-new-btn:hover{background:var(--accent);color:#000}
-.sidebar-status{
-  margin:8px 12px 12px;padding:10px 12px;border-radius:var(--radius);
-  background:var(--surface2);border:1px solid var(--border);font-size:11px;
-}
-.status-row{display:flex;justify-content:space-between;margin-bottom:3px}
-.status-label{color:var(--muted)}
-.status-val{color:var(--text);font-family:var(--font-mono);font-size:10px}
-.status-ok{color:var(--green)}
-.status-warn{color:var(--orange)}
+    /* ── HEADER ─────────────────────────────────────────────────────── */
+    .hdr {
+      height: 52px; display: flex; align-items: center; gap: 0;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg2); padding: 0 20px; flex-shrink: 0;
+      position: relative; z-index: 10;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; width: 200px; flex-shrink: 0; }
+    .logo-icon { font-size: 18px; }
+    .logo-name { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo-name span { color: var(--amber); }
+    .logo-v { font-size: 10px; color: var(--text3); font-family: var(--mono);
+              background: var(--bg3); border: 1px solid var(--border); padding: 1px 5px; border-radius: 3px; }
 
-/* ── Main chat area ─────────────────────────────────────────────────────── */
-.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+    .steps { flex: 1; display: flex; justify-content: center; align-items: center; gap: 0; }
+    .step-item { display: flex; align-items: center; gap: 6px; }
+    .step-dot {
+      width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 600; color: var(--text3); transition: all .3s;
+      font-family: var(--mono);
+    }
+    .step-label { font-size: 11px; color: var(--text3); font-weight: 500; transition: color .3s; }
+    .step-line { width: 40px; height: 1px; background: var(--border); margin: 0 4px; transition: background .3s; }
+    .step-item.done .step-dot { background: var(--green-bg); border-color: var(--green); color: var(--green); }
+    .step-item.done .step-label { color: var(--green); }
+    .step-item.done + .step-line { background: var(--green); }
+    .step-item.active .step-dot { background: var(--amber-bg); border-color: var(--amber); color: var(--amber); }
+    .step-item.active .step-label { color: var(--amber); font-weight: 600; }
 
-.chat-header{
-  padding:16px 24px;border-bottom:1px solid var(--border);
-  background:var(--surface);display:flex;align-items:center;gap:12px;
-}
-.chat-header-title{font-family:var(--font-display);font-size:18px;font-weight:600;
-  color:var(--text);letter-spacing:-0.3px}
-.chat-header-sub{font-size:12px;color:var(--muted);margin-top:1px}
-.header-session-badge{
-  margin-left:auto;font-family:var(--font-mono);font-size:11px;
-  color:var(--muted);background:var(--surface2);
-  padding:4px 10px;border-radius:20px;border:1px solid var(--border);
-}
+    .hdr-right { width: 220px; display: flex; align-items: center; gap: 8px; justify-content: flex-end; flex-shrink: 0; }
+    .rules-pill {
+      display: flex; align-items: center; gap: 5px; padding: 3px 8px;
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 20px;
+      font-size: 11px; color: var(--text2); font-family: var(--mono);
+    }
+    .rules-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); }
+    .rules-dot.ok { background: var(--green); box-shadow: 0 0 4px var(--green); }
+    .btn { cursor: pointer; border: none; font-family: var(--sans); font-size: 12px; font-weight: 600;
+           letter-spacing: .3px; border-radius: var(--r); transition: all .15s; }
+    .btn-new {
+      padding: 5px 12px; background: var(--amber); color: #000;
+    }
+    .btn-new:hover { background: var(--amber2); }
+    .btn-hist {
+      padding: 5px 10px; background: transparent; color: var(--text2);
+      border: 1px solid var(--border2); 
+    }
+    .btn-hist:hover { border-color: var(--amber); color: var(--amber); }
 
-.chat-messages{
-  flex:1;overflow-y:auto;padding:24px;
-  display:flex;flex-direction:column;gap:16px;
-}
+    /* ── MAIN LAYOUT ────────────────────────────────────────────────── */
+    .app { display: flex; height: calc(100vh - 52px); overflow: hidden; }
 
-/* ── Welcome screen ─────────────────────────────────────────────────────── */
-.welcome{
-  margin:auto;text-align:center;max-width:440px;
-  animation:fadeUp .5s ease both;
-}
-.welcome-icon{font-size:48px;margin-bottom:16px}
-.welcome-title{
-  font-family:var(--font-display);font-size:28px;font-weight:600;
-  color:var(--gold);letter-spacing:-1px;margin-bottom:8px;
-}
-.welcome-sub{font-size:14px;color:var(--muted);line-height:1.7;margin-bottom:28px}
-.welcome-upload-zone{
-  border:2px dashed var(--border2);border-radius:16px;
-  padding:32px 24px;cursor:pointer;transition:all .2s;
-  background:var(--surface);
-}
-.welcome-upload-zone:hover,.welcome-upload-zone.drag-over{
-  border-color:var(--accent);background:var(--accent-dim);
-}
-.upload-icon{font-size:32px;margin-bottom:8px}
-.upload-label{font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px}
-.upload-hint{font-size:12px;color:var(--muted)}
-#welcome-file-input{display:none}
+    /* ── CHAT PANEL ─────────────────────────────────────────────────── */
+    .chat-panel {
+      width: 440px; flex-shrink: 0; display: flex; flex-direction: column;
+      border-right: 1px solid var(--border); background: var(--bg);
+    }
+    .msgs {
+      flex: 1; overflow-y: auto; padding: 20px 16px; display: flex;
+      flex-direction: column; gap: 4px;
+      scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+    }
+    .msg { display: flex; gap: 8px; animation: fadeUp .25s ease both; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
 
-/* ── Chat bubbles ───────────────────────────────────────────────────────── */
-.message{display:flex;gap:12px;animation:fadeUp .3s ease both}
-.message.user{flex-direction:row-reverse}
+    .msg-avatar {
+      width: 28px; height: 28px; border-radius: 4px; flex-shrink: 0; margin-top: 2px;
+      display: flex; align-items: center; justify-content: center; font-size: 13px;
+    }
+    .msg.agent .msg-avatar { background: var(--amber-bg); border: 1px solid var(--amber2); }
+    .msg.user .msg-avatar { background: var(--blue-bg); border: 1px solid var(--blue); }
+    .msg.user { flex-direction: row-reverse; }
 
-.avatar{
-  width:34px;height:34px;border-radius:50%;flex-shrink:0;
-  display:flex;align-items:center;justify-content:center;
-  font-size:16px;
-}
-.avatar.agent{background:var(--accent-dim);border:1px solid var(--accent)40}
-.avatar.user-av{background:var(--surface2);border:1px solid var(--border2)}
+    .msg-body { max-width: 340px; }
+    .msg.user .msg-body { text-align: right; }
+    .msg-bubble {
+      display: inline-block; padding: 9px 13px; border-radius: var(--r);
+      line-height: 1.55; font-size: 13px;
+    }
+    .msg.agent .msg-bubble { background: var(--bg3); border: 1px solid var(--border); }
+    .msg.user .msg-bubble { background: var(--blue-bg); border: 1px solid var(--blue); color: #c5daff; }
 
-.bubble{
-  max-width:72%;padding:12px 16px;border-radius:16px;
-  font-size:14px;line-height:1.65;
-}
-.bubble.agent{
-  background:var(--surface);border:1px solid var(--border);
-  border-top-left-radius:4px;
-}
-.bubble.user{
-  background:var(--accent-dim);border:1px solid var(--accent)30;
-  color:var(--text);border-top-right-radius:4px;
-  text-align:right;
-}
+    /* Cards */
+    .card {
+      margin: 6px 0 2px 36px; background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--r); overflow: hidden; animation: fadeUp .25s ease both;
+    }
+    .card-hdr {
+      padding: 8px 12px; background: var(--bg3); border-bottom: 1px solid var(--border);
+      font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase;
+      color: var(--text2); display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-body { padding: 12px; font-size: 12.5px; line-height: 1.6; }
 
-/* ── Progress steps ─────────────────────────────────────────────────────── */
-.progress-msg{
-  display:flex;align-items:center;gap:10px;
-  padding:10px 14px;border-radius:10px;
-  background:var(--surface2);border:1px solid var(--border);
-  font-size:13px;color:var(--muted);
-  animation:fadeUp .25s ease both;
-}
-.progress-spinner{
-  width:16px;height:16px;border:2px solid var(--border2);
-  border-top-color:var(--accent);border-radius:50%;
-  animation:spin .8s linear infinite;flex-shrink:0;
-}
-.progress-check{width:16px;height:16px;flex-shrink:0;color:var(--green);font-size:14px}
+    /* Metrics table */
+    .metrics-tbl { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12px; }
+    .metrics-tbl td { padding: 5px 6px; border-bottom: 1px solid var(--border); }
+    .metrics-tbl td:first-child { color: var(--text2); width: 55%; }
+    .metrics-tbl td:last-child { color: var(--text); text-align: right; }
+    .metrics-tbl tr:last-child td { border-bottom: none; }
+    .flag-ok   { color: var(--green); }
+    .flag-warn { color: var(--amber); }
+    .flag-bad  { color: var(--red);   }
 
-/* ── Thinking indicator ─────────────────────────────────────────────────── */
-.thinking{display:flex;gap:5px;padding:14px 16px;align-items:center}
-.dot{
-  width:7px;height:7px;border-radius:50%;background:var(--accent);opacity:.3;
-  animation:pulse 1.2s ease-in-out infinite;
-}
-.dot:nth-child(2){animation-delay:.2s}
-.dot:nth-child(3){animation-delay:.4s}
+    /* Findings */
+    .finding-item { padding: 6px 8px; border-radius: var(--r); margin-bottom: 4px; font-size: 12px; line-height: 1.5; }
+    .finding-item.HIGH   { background: var(--red-bg);   border-left: 2px solid var(--red);   }
+    .finding-item.MEDIUM { background: var(--amber-bg); border-left: 2px solid var(--amber); }
+    .finding-item.LOW    { background: var(--green-bg); border-left: 2px solid var(--green); }
+    .finding-badge {
+      display: inline-block; font-size: 9px; font-weight: 700; letter-spacing: .5px;
+      padding: 1px 5px; border-radius: 2px; margin-right: 5px; font-family: var(--mono);
+    }
+    .badge-HIGH   { background: var(--red);   color: #fff; }
+    .badge-MEDIUM { background: var(--amber); color: #000; }
+    .badge-LOW    { background: var(--green); color: #000; }
 
-/* ── Action card (confirmation) ─────────────────────────────────────────── */
-.action-card{
-  max-width:72%;padding:16px;border-radius:16px;
-  background:var(--surface);border:1px solid var(--border2);
-  border-top-left-radius:4px;
-  animation:fadeUp .35s ease both;
-}
-.action-card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
-.action-card-sub{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.6}
-.action-btns{display:flex;gap:8px;flex-wrap:wrap}
-.btn-primary{
-  padding:9px 20px;border-radius:8px;border:none;font-size:13px;font-weight:700;
-  background:var(--accent);color:#000;letter-spacing:.3px;
-  transition:all .15s;
-}
-.btn-primary:hover{background:#7dd3fc;transform:translateY(-1px)}
-.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
-.btn-secondary{
-  padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;
-  background:transparent;border:1px solid var(--border2);color:var(--muted);
-  transition:all .15s;
-}
-.btn-secondary:hover{border-color:var(--text);color:var(--text)}
+    /* Action buttons in chat */
+    .action-row { margin: 8px 0 4px 36px; display: flex; gap: 8px; animation: fadeUp .25s ease both; }
+    .act-btn {
+      cursor: pointer; padding: 7px 14px; border: none; border-radius: var(--r);
+      font-family: var(--sans); font-size: 12px; font-weight: 600; letter-spacing: .3px;
+      transition: all .15s;
+    }
+    .act-btn.primary { background: var(--amber); color: #000; }
+    .act-btn.primary:hover { background: var(--amber2); transform: translateY(-1px); }
+    .act-btn.secondary { background: transparent; color: var(--text2); border: 1px solid var(--border2); }
+    .act-btn.secondary:hover { border-color: var(--text2); color: var(--text); }
+    .act-btn:disabled { opacity: .4; cursor: not-allowed; transform: none !important; }
 
-/* ── Findings preview card ─────────────────────────────────────────────── */
-.findings-card{
-  background:var(--surface2);border:1px solid var(--border);
-  border-radius:12px;overflow:hidden;margin-top:10px;
-}
-.findings-header{
-  padding:12px 16px;display:flex;align-items:center;justify-content:space-between;
-  border-bottom:1px solid var(--border);cursor:pointer;
-}
-.findings-header-left{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600}
-.severity-chips{display:flex;gap:6px}
-.chip{
-  font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;
-  letter-spacing:.5px;text-transform:uppercase;
-}
-.chip-high  {background:#2e0a0a;color:var(--red)}
-.chip-medium{background:#1e1200;color:var(--orange)}
-.chip-low   {background:#1a1800;color:var(--yellow)}
-.findings-body{
-  padding:14px 16px;font-size:12px;color:var(--muted);
-  font-family:var(--font-mono);line-height:1.7;max-height:200px;overflow-y:auto;
-  white-space:pre-wrap;word-break:break-word;
-}
-.findings-toggle{font-size:11px;color:var(--accent);font-weight:600}
+    /* Loading card */
+    .loading-card {
+      margin: 6px 0 2px 36px; padding: 12px 14px; background: var(--bg2);
+      border: 1px solid var(--border); border-radius: var(--r);
+      animation: fadeUp .25s ease both;
+    }
+    .loading-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 12.5px; }
+    .loading-row .spinner {
+      width: 14px; height: 14px; border: 1.5px solid var(--border2);
+      border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; flex-shrink: 0;
+    }
+    .loading-row .check { color: var(--green); font-size: 13px; flex-shrink: 0; }
+    .loading-row .dot3 { color: var(--text2); }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Report card ────────────────────────────────────────────────────────── */
-.report-card{
-  max-width:90%;background:var(--surface);border:1px solid var(--border);
-  border-radius:16px;overflow:hidden;animation:fadeUp .4s ease both;
-}
-.report-card-header{
-  padding:14px 20px;background:var(--surface2);border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;
-}
-.report-card-title{font-family:var(--font-display);font-size:16px;color:var(--gold)}
-.report-card-meta{font-size:11px;color:var(--muted);font-family:var(--font-mono)}
-.report-actions{display:flex;gap:8px}
-.btn-icon{
-  padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;
-  background:var(--surface);border:1px solid var(--border2);color:var(--muted);
-  transition:all .15s;
-}
-.btn-icon:hover{border-color:var(--accent);color:var(--accent)}
-.report-body{
-  padding:20px 24px;max-height:520px;overflow-y:auto;
-  font-size:13px;line-height:1.8;color:var(--text);
-}
-/* Markdown inside report */
-.report-body h1{font-family:var(--font-display);font-size:20px;color:var(--gold);
-  margin:20px 0 8px;font-weight:600}
-.report-body h2{font-family:var(--font-display);font-size:16px;color:var(--accent);
-  margin:18px 0 6px;font-weight:400;letter-spacing:.3px}
-.report-body h3{font-size:13px;font-weight:700;color:var(--text);margin:12px 0 4px}
-.report-body p{margin-bottom:10px;color:var(--muted)}
-.report-body strong{color:var(--text);font-weight:600}
-.report-body table{width:100%;border-collapse:collapse;margin:12px 0;font-size:12px}
-.report-body th{background:var(--surface2);padding:8px 10px;text-align:left;
-  border-bottom:1px solid var(--border2);color:var(--muted);font-weight:600;
-  font-size:10px;text-transform:uppercase;letter-spacing:1px}
-.report-body td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text)}
-.report-body tr:last-child td{border:none}
-.report-body code{font-family:var(--font-mono);background:var(--surface2);
-  padding:1px 5px;border-radius:4px;font-size:11px;color:var(--green)}
-.report-body pre{background:var(--surface2);border:1px solid var(--border);
-  border-radius:8px;padding:14px;overflow-x:auto;margin:12px 0}
-.report-body pre code{background:none;padding:0;font-size:11px}
-.report-body hr{border:none;border-top:1px solid var(--border);margin:16px 0}
-.report-body blockquote{border-left:3px solid var(--accent);padding-left:12px;
-  color:var(--muted);font-style:italic;margin:10px 0}
-.report-body ul,
-.report-body ol{padding-left:20px;margin-bottom:10px;color:var(--muted)}
-.report-body li{margin-bottom:4px}
+    /* Typing indicator */
+    .typing { display: flex; align-items: center; gap: 8px; padding: 8px 36px; }
+    .typing-dots { display: flex; gap: 4px; }
+    .typing-dots span {
+      width: 5px; height: 5px; border-radius: 50%; background: var(--text3);
+      animation: bounce .8s ease infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: .15s; }
+    .typing-dots span:nth-child(3) { animation-delay: .3s; }
+    @keyframes bounce { 0%,80%,100% { transform: scale(1); } 40% { transform: scale(1.4); background: var(--amber); } }
 
-/* ── Upload bar (bottom) ─────────────────────────────────────────────────── */
-.chat-input-area{
-  padding:14px 20px;border-top:1px solid var(--border);
-  background:var(--surface);
-}
-.upload-bar{
-  display:flex;align-items:center;gap:10px;
-  background:var(--surface2);border:1px solid var(--border2);
-  border-radius:12px;padding:8px 12px;cursor:pointer;transition:border-color .2s;
-}
-.upload-bar:hover{border-color:var(--accent)}
-.upload-bar-icon{font-size:18px}
-.upload-bar-text{font-size:13px;color:var(--muted);flex:1}
-.upload-bar-text span{color:var(--accent);font-weight:600}
-#main-file-input{display:none}
-.api-url-row{
-  display:flex;align-items:center;gap:8px;margin-top:8px;
-}
-.api-url-input{
-  flex:1;background:var(--surface2);border:1px solid var(--border);
-  border-radius:8px;padding:6px 10px;font-family:var(--font-mono);
-  font-size:11px;color:var(--muted);outline:none;
-}
-.api-url-input:focus{border-color:var(--accent);color:var(--text)}
-.api-url-label{font-size:11px;color:var(--muted);white-space:nowrap}
+    /* Upload zone */
+    .upload-area {
+      padding: 12px 16px; border-top: 1px solid var(--border);
+      background: var(--bg2); flex-shrink: 0;
+    }
+    .upload-zone {
+      border: 1.5px dashed var(--border2); border-radius: var(--r);
+      padding: 18px 16px; text-align: center; cursor: pointer;
+      transition: all .2s; background: var(--bg);
+    }
+    .upload-zone:hover, .upload-zone.drag-over {
+      border-color: var(--amber); background: var(--amber-bg);
+    }
+    .upload-zone-icon { font-size: 22px; margin-bottom: 6px; }
+    .upload-zone-text { font-size: 12.5px; color: var(--text2); }
+    .upload-zone-hint { font-size: 11px; color: var(--text3); margin-top: 3px; }
+    .upload-zone.has-file { border-color: var(--green); border-style: solid; background: var(--green-bg); }
+    .upload-zone.has-file .upload-zone-icon { opacity: .5; }
 
-/* ── Animations ──────────────────────────────────────────────────────────── */
-@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
-@keyframes spin{to{transform:rotate(360deg)}}
-@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+    /* ── REPORT PANEL ───────────────────────────────────────────────── */
+    .report-panel {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+      background: var(--bg);
+    }
+    .report-toolbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 20px; border-bottom: 1px solid var(--border);
+      background: var(--bg2); flex-shrink: 0;
+    }
+    .report-title { font-size: 11px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--text3); }
+    .opinion-badge {
+      padding: 3px 10px; border-radius: 2px; font-size: 11px; font-weight: 700;
+      letter-spacing: .5px; font-family: var(--mono);
+    }
+    .op-Unqualified  { background: var(--green-bg); color: var(--green); border: 1px solid var(--green); }
+    .op-Qualified    { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber); }
+    .op-Adverse      { background: var(--red-bg);   color: var(--red);   border: 1px solid var(--red);   }
+    .op-Disclaimer   { background: var(--bg3);      color: var(--text2); border: 1px solid var(--border2); }
+    .report-btns { display: flex; gap: 6px; }
+    .icon-btn {
+      cursor: pointer; background: transparent; border: 1px solid var(--border2);
+      color: var(--text2); padding: 4px 10px; border-radius: var(--r);
+      font-size: 11px; font-family: var(--sans); transition: all .15s;
+    }
+    .icon-btn:hover { border-color: var(--text2); color: var(--text); }
 
-/* ── Responsive ──────────────────────────────────────────────────────────── */
-@media(max-width:700px){
-  .sidebar{display:none}
-  .bubble{max-width:90%}
-  .action-card{max-width:90%}
-}
-</style>
+    .report-empty {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 12px; color: var(--text3);
+    }
+    .report-empty-icon { font-size: 48px; opacity: .3; }
+    .report-empty-title { font-size: 14px; font-weight: 600; }
+    .report-empty-sub { font-size: 12px; line-height: 1.5; text-align: center; max-width: 280px; }
+
+    .report-body {
+      flex: 1; overflow-y: auto; padding: 24px 32px;
+      scrollbar-width: thin; scrollbar-color: var(--border2) transparent;
+    }
+
+    /* Markdown styles */
+    .md h1 { font-size: 20px; font-weight: 700; margin-bottom: 6px; color: var(--text); padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+    .md h2 { font-size: 14px; font-weight: 700; margin: 20px 0 8px; color: var(--amber); text-transform: uppercase; letter-spacing: .5px; }
+    .md h3 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: var(--text2); }
+    .md p  { font-size: 13px; line-height: 1.65; margin-bottom: 10px; color: var(--text); }
+    .md strong { color: var(--text); font-weight: 600; }
+    .md em { color: var(--text2); font-style: italic; }
+    .md table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
+    .md th { background: var(--bg3); padding: 7px 10px; text-align: left; border: 1px solid var(--border2);
+             font-size: 11px; letter-spacing: .3px; color: var(--text2); }
+    .md td { padding: 6px 10px; border: 1px solid var(--border); font-family: var(--mono); font-size: 12px; }
+    .md tr:nth-child(even) td { background: var(--bg2); }
+    .md code { font-family: var(--mono); font-size: 11.5px; background: var(--bg3); padding: 1px 5px; border-radius: 3px; color: var(--amber); }
+    .md pre { background: var(--bg3); border: 1px solid var(--border); border-radius: var(--r); padding: 14px; margin: 12px 0; overflow-x: auto; }
+    .md pre code { background: none; padding: 0; font-size: 12px; color: var(--text); }
+    .md ul, .md ol { padding-left: 20px; margin-bottom: 10px; }
+    .md li { font-size: 13px; line-height: 1.6; margin-bottom: 3px; }
+    .md hr { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+    .md blockquote { border-left: 2px solid var(--amber2); padding-left: 12px; color: var(--text2); margin: 10px 0; }
+
+    /* ── SESSION HISTORY DRAWER ─────────────────────────────────────── */
+    .drawer-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 40;
+      display: none; backdrop-filter: blur(2px);
+    }
+    .drawer-overlay.open { display: block; }
+    .drawer {
+      position: fixed; right: 0; top: 0; bottom: 0; width: 320px;
+      background: var(--bg2); border-left: 1px solid var(--border);
+      z-index: 50; transform: translateX(100%); transition: transform .25s ease;
+      display: flex; flex-direction: column;
+    }
+    .drawer.open { transform: translateX(0); }
+    .drawer-hdr {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 13px; font-weight: 600;
+    }
+    .drawer-close { cursor: pointer; background: none; border: none; color: var(--text2); font-size: 16px; }
+    .drawer-list { flex: 1; overflow-y: auto; padding: 10px; }
+    .sess-item {
+      padding: 10px 12px; border-radius: var(--r); border: 1px solid var(--border);
+      margin-bottom: 6px; cursor: pointer; transition: all .15s; background: var(--bg3);
+    }
+    .sess-item:hover { border-color: var(--border2); background: var(--bg4); }
+    .sess-name { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sess-meta { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+    .sess-stage { font-size: 10px; font-family: var(--mono); padding: 1px 6px; border-radius: 2px; }
+    .ss-done { background: var(--green-bg); color: var(--green); }
+    .ss-analyzing { background: var(--amber-bg); color: var(--amber); }
+    .ss-error { background: var(--red-bg); color: var(--red); }
+    .ss-other { background: var(--bg3); color: var(--text3); }
+    .sess-date { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+
+    .divider { height: 1px; background: var(--border); margin: 8px 0; }
+    pre.text-preview { font-family: var(--mono); font-size: 11px; color: var(--text2);
+                       white-space: pre-wrap; word-break: break-word; max-height: 80px; overflow: hidden; }
+  </style>
 </head>
 <body>
+
+<!-- Header -->
+<header class="hdr">
+  <div class="logo">
+    <span class="logo-icon">⚖</span>
+    <span class="logo-name">Fin<span>Audit</span> AI</span>
+    <span class="logo-v">v3.1</span>
+  </div>
+
+  <div class="steps" id="stepRow">
+    <div class="step-item active" id="s1"><div class="step-dot">1</div><span class="step-label">Parse</span></div>
+    <div class="step-line" id="l1"></div>
+    <div class="step-item" id="s2"><div class="step-dot">2</div><span class="step-label">Analyze</span></div>
+    <div class="step-line" id="l2"></div>
+    <div class="step-item" id="s3"><div class="step-dot">3</div><span class="step-label">Audit</span></div>
+    <div class="step-line" id="l3"></div>
+    <div class="step-item" id="s4"><div class="step-dot">4</div><span class="step-label">Report</span></div>
+  </div>
+
+  <div class="hdr-right">
+    <div class="rules-pill" id="rulesPill">
+      <span class="rules-dot" id="rulesDot"></span>
+      <span id="rulesText">—</span>
+    </div>
+    <button class="btn btn-hist" onclick="openDrawer()">History</button>
+    <button class="btn btn-new" onclick="newSession()">+ New Audit</button>
+  </div>
+</header>
+
+<!-- App body -->
 <div class="app">
 
-  <!-- ── Sidebar ─────────────────────────────────────────────────── -->
-  <aside class="sidebar">
-    <div class="sidebar-logo">
-      <div class="logo-wordmark">AuditAI</div>
-      <div class="logo-sub">Autonomous Financial Audit</div>
-    </div>
-
-    <button class="sidebar-new-btn" onclick="startNewSession()">＋ New Audit Session</button>
-
-    <div class="sidebar-status" id="sidebar-status">
-      <div class="status-row">
-        <span class="status-label">API</span>
-        <span class="status-val" id="api-status">—</span>
+  <!-- Chat Panel -->
+  <aside class="chat-panel">
+    <div class="msgs" id="msgs"></div>
+    <div class="upload-area">
+      <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+        <div class="upload-zone-icon">📄</div>
+        <div class="upload-zone-text" id="uzText">Drop financial PDF here</div>
+        <div class="upload-zone-hint" id="uzHint">or click to browse · PDF only</div>
       </div>
-      <div class="status-row">
-        <span class="status-label">Rules KB</span>
-        <span class="status-val" id="rules-status">—</span>
-      </div>
-    </div>
-
-    <div class="sidebar-section">Recent Sessions</div>
-    <div class="sidebar-sessions" id="session-list">
-      <div style="padding:12px;font-size:12px;color:var(--muted)">No sessions yet</div>
+      <input type="file" id="fileInput" accept=".pdf" hidden />
     </div>
   </aside>
 
-  <!-- ── Main ───────────────────────────────────────────────────── -->
-  <div class="main">
-    <header class="chat-header">
-      <div>
-        <div class="chat-header-title">Financial Audit Assistant</div>
-        <div class="chat-header-sub" id="header-sub">Upload a financial PDF to begin</div>
-      </div>
-      <div class="header-session-badge" id="header-session-id" style="display:none"></div>
-    </header>
-
-    <div class="chat-messages" id="chat-messages">
-      <!-- Welcome -->
-      <div class="welcome" id="welcome-screen">
-        <div class="welcome-icon">📊</div>
-        <div class="welcome-title">Audit any financial statement</div>
-        <div class="welcome-sub">
-          Upload a PDF — I'll parse it, run clause-by-clause CARO 2020 compliance analysis,
-          compute financial ratios, and generate a publishable audit report.
-          You confirm each step.
+  <!-- Report Panel -->
+  <section class="report-panel">
+    <div class="report-toolbar">
+      <span class="report-title">Report Preview</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span id="opinionBadge" style="display:none"></span>
+        <div class="report-btns" id="reportBtns" style="display:none">
+          <button class="icon-btn" onclick="downloadReport()">⬇ Download</button>
+          <button class="icon-btn" onclick="copyReport()">⎘ Copy</button>
         </div>
-        <div class="welcome-upload-zone" id="welcome-drop-zone"
-             onclick="document.getElementById('welcome-file-input').click()"
-             ondragover="onDragOver(event)" ondrop="onDrop(event,'welcome')"
-             ondragleave="onDragLeave(event)">
-          <div class="upload-icon">📎</div>
-          <div class="upload-label">Drop your financial PDF here</div>
-          <div class="upload-hint">or click to browse · PDF only</div>
-        </div>
-        <input type="file" id="welcome-file-input" accept=".pdf" onchange="onFileSelect(event,'welcome')"/>
       </div>
     </div>
 
-    <!-- Bottom upload bar -->
-    <div class="chat-input-area" id="bottom-bar" style="display:none">
-      <div class="upload-bar"
-           onclick="document.getElementById('main-file-input').click()"
-           ondragover="onDragOver(event)" ondrop="onDrop(event,'main')"
-           ondragleave="onDragLeave(event)">
-        <span class="upload-bar-icon">📎</span>
-        <span class="upload-bar-text">Drop a new PDF, or <span>click to upload</span> a different document</span>
-      </div>
-      <input type="file" id="main-file-input" accept=".pdf" onchange="onFileSelect(event,'main')"/>
-      <div class="api-url-row">
-        <span class="api-url-label">API</span>
-        <input class="api-url-input" id="api-url-input" value="http://localhost:8000"
-               oninput="API_BASE=this.value.replace(/\/$/,'')" placeholder="http://localhost:8000"/>
-      </div>
+    <div class="report-empty" id="reportEmpty">
+      <div class="report-empty-icon">📋</div>
+      <div class="report-empty-title">Audit Report Preview</div>
+      <div class="report-empty-sub">Upload a financial PDF and step through the analysis to see your report rendered here.</div>
     </div>
+
+    <div class="report-body md" id="reportBody" style="display:none"></div>
+  </section>
+</div>
+
+<!-- Session Drawer -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-hdr">
+    <span>Recent Sessions</span>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-list" id="drawerList">
+    <div style="padding:20px;text-align:center;color:var(--text3);font-size:12px;">Loading...</div>
   </div>
 </div>
 
 <script>
-// ── Config ────────────────────────────────────────────────────────────────────
-let API_BASE = 'http://localhost:8000';
-let currentSessionId = null;
-let eventSource = null;
-let analysisData = null;
-let reportId = null;
-let findingsExpanded = false;
+const API = 'http://localhost:8000';
 
-// ── Boot ───────────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', async () => {
-  await fetchServerStatus();
-  await loadSessionList();
-  // Sync API URL input
-  document.getElementById('api-url-input').value = API_BASE;
-  document.getElementById('api-url-input').oninput = function() {
-    API_BASE = this.value.replace(/\/$/, '');
-  };
-});
+// ── State ────────────────────────────────────────────────────────────────────
+const S = {
+  sessionId: null, fileHash: null, fileName: null,
+  stage: 'idle',  // idle|uploading|ingested|analyzing|analyzed|reporting|done|error
+  analysisData: null, reportMarkdown: '',
+};
 
-// ── Server health ─────────────────────────────────────────────────────────────
-async function fetchServerStatus() {
-  try {
-    const r = await fetch(`${API_BASE}/`);
-    const d = await r.json();
-    const rulesCount = d.rules_kb?.chunks || 0;
-    document.getElementById('api-status').textContent = '● Online';
-    document.getElementById('api-status').className = 'status-val status-ok';
-    document.getElementById('rules-status').textContent =
-      rulesCount > 0 ? `${rulesCount} chunks` : 'Empty';
-    document.getElementById('rules-status').className =
-      `status-val ${rulesCount > 0 ? 'status-ok' : 'status-warn'}`;
-  } catch {
-    document.getElementById('api-status').textContent = '● Offline';
-    document.getElementById('api-status').className = 'status-val status-warn';
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const msgs = document.getElementById('msgs');
+const scrollDown = () => msgs.scrollTop = msgs.scrollHeight;
+
+// ── Typing indicator ─────────────────────────────────────────────────────────
+function showTyping() {
+  const el = document.createElement('div');
+  el.className = 'typing'; el.id = 'typing';
+  el.innerHTML = `<div style="width:28px"></div><div class="typing-dots"><span></span><span></span><span></span></div>`;
+  msgs.appendChild(el); scrollDown(); return el;
+}
+function hideTyping() { document.getElementById('typing')?.remove(); }
+
+// ── Add message ──────────────────────────────────────────────────────────────
+async function agentMsg(html, skipDelay = false) {
+  if (!skipDelay) { const t = showTyping(); await sleep(380); t.remove(); }
+  const d = document.createElement('div');
+  d.className = 'msg agent';
+  d.innerHTML = `<div class="msg-avatar">⚖</div><div class="msg-body"><div class="msg-bubble">${html}</div></div>`;
+  msgs.appendChild(d); scrollDown();
+}
+function userMsg(text) {
+  const d = document.createElement('div');
+  d.className = 'msg user';
+  d.innerHTML = `<div class="msg-avatar">👤</div><div class="msg-body"><div class="msg-bubble">${text}</div></div>`;
+  msgs.appendChild(d); scrollDown();
+}
+
+// ── Cards ────────────────────────────────────────────────────────────────────
+function addCard(id, title, bodyHtml, extraClass = '') {
+  const d = document.createElement('div');
+  d.className = 'card' + (extraClass ? ' ' + extraClass : '');
+  if (id) d.id = id;
+  d.innerHTML = `<div class="card-hdr">${title}</div><div class="card-body">${bodyHtml}</div>`;
+  msgs.appendChild(d); scrollDown(); return d;
+}
+
+function addActionRow(id, buttons) {
+  const row = document.createElement('div');
+  row.className = 'action-row'; row.id = id;
+  row.innerHTML = buttons.map(b =>
+    `<button class="act-btn ${b.cls || 'primary'}" onclick="${b.fn}" id="${b.id||''}">${b.label}</button>`
+  ).join('');
+  msgs.appendChild(row); scrollDown();
+}
+
+function removeEl(id) { document.getElementById(id)?.remove(); }
+
+// ── Step indicator ───────────────────────────────────────────────────────────
+function setStep(n) {
+  for (let i = 1; i <= 4; i++) {
+    const s = document.getElementById('s' + i);
+    s.classList.remove('done', 'active');
+    if (i < n) { s.classList.add('done'); s.querySelector('.step-dot').textContent = '✓'; }
+    else if (i === n) { s.classList.add('active'); }
+    if (i < 4) {
+      const l = document.getElementById('l' + i);
+      l.style.background = i < n ? 'var(--green)' : 'var(--border)';
+    }
   }
 }
 
-// ── Session list ──────────────────────────────────────────────────────────────
-async function loadSessionList() {
+// ── Rules status ──────────────────────────────────────────────────────────────
+async function loadRulesStatus() {
   try {
-    const r = await fetch(`${API_BASE}/sessions/`);
-    const d = await r.json();
-    const list = document.getElementById('session-list');
-    if (!d.sessions?.length) {
-      list.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--muted)">No sessions yet</div>';
+    const r = await fetch(`${API}/rules-status/`).then(x => x.json());
+    document.getElementById('rulesDot').className = 'rules-dot ' + (r.chunks > 0 ? 'ok' : '');
+    document.getElementById('rulesText').textContent = r.chunks > 0 ? `${r.chunks} rules` : 'No rules';
+  } catch { document.getElementById('rulesText').textContent = 'Offline'; }
+}
+
+// ── Upload handler ────────────────────────────────────────────────────────────
+async function handleUpload(file) {
+  if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
+    agentMsg('⚠ Only PDF files are accepted.'); return;
+  }
+  if (S.stage !== 'idle') {
+    agentMsg('⚠ Start a new audit session first.'); return;
+  }
+
+  // Update upload zone
+  const uz = document.getElementById('uploadZone');
+  uz.classList.add('has-file');
+  document.getElementById('uzText').textContent = `📄 ${file.name}`;
+  document.getElementById('uzHint').textContent = `${(file.size / 1024).toFixed(0)} KB`;
+
+  userMsg(`Uploading <strong>${file.name}</strong>`);
+  S.stage = 'uploading';
+
+  // Loading card
+  const lc = document.createElement('div');
+  lc.className = 'loading-card'; lc.id = 'parse-loading';
+  lc.innerHTML = `<div class="loading-row"><div class="spinner"></div><span style="color:var(--text2)">Parsing PDF — extracting text &amp; OCR…</span></div>`;
+  msgs.appendChild(lc); scrollDown();
+
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const res = await fetch(`${API}/session/`, { method: 'POST', body: fd });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail || res.statusText); }
+    const data = await res.json();
+
+    removeEl('parse-loading');
+    S.sessionId = data.session_id;
+    S.fileHash  = data.file_hash;
+    S.fileName  = data.file_name;
+    S.stage     = 'ingested';
+    setStep(1);
+
+    const cacheNote = data.cache_hit
+      ? `<br><span style="color:var(--green);font-size:11px">⚡ Cached — this file was previously analyzed. Analysis will be instant.</span>`
+      : '';
+
+    await agentMsg(`✅ Parsed <strong>${file.name}</strong> successfully.${cacheNote}`);
+
+    // Document preview card
+    const preview = data.text_preview.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    addCard('doc-card', `📄 DOCUMENT · <span style="font-family:var(--mono);color:var(--amber)">${data.text_length.toLocaleString()} chars</span>`,
+      `<pre class="text-preview">${preview}…</pre>`);
+
+    await agentMsg(`Ready to run compliance analysis? This queries your CARO 2020 rules knowledge base and extracts financial metrics.<br><span style="font-size:11px;color:var(--text3)">~3 API calls · 15–60s · free-tier safe</span>`);
+    addActionRow('act-analyze', [
+      { label: '▶ Begin Analysis', fn: 'confirmAnalysis()', id: 'btnAnalyze' },
+      { label: 'Cancel', fn: 'cancelAction()', cls: 'secondary' },
+    ]);
+    setStep(2);
+
+  } catch (err) {
+    removeEl('parse-loading');
+    S.stage = 'idle';
+    uz.classList.remove('has-file');
+    document.getElementById('uzText').textContent = 'Drop financial PDF here';
+    document.getElementById('uzHint').textContent = 'or click to browse · PDF only';
+    await agentMsg(`❌ Upload failed: ${err.message}`);
+  }
+}
+
+// ── Analysis ──────────────────────────────────────────────────────────────────
+async function confirmAnalysis() {
+  removeEl('act-analyze');
+  userMsg('Begin Analysis');
+  S.stage = 'analyzing';
+
+  // Build a loading card with animated steps
+  const lc = document.createElement('div');
+  lc.className = 'loading-card'; lc.id = 'analyze-loading';
+  lc.innerHTML = `
+    <div class="loading-row" id="al1"><div class="spinner"></div><span class="dot3">Querying CARO 2020 compliance rules…</span></div>
+    <div class="loading-row" id="al2" style="opacity:.3"><div style="width:14px"></div><span>Extracting financial metrics…</span></div>
+    <div class="loading-row" id="al3" style="opacity:.3"><div style="width:14px"></div><span>Running clause-by-clause audit…</span></div>`;
+  msgs.appendChild(lc); scrollDown();
+
+  // Animate step highlights while API runs
+  const stepTimers = [
+    setTimeout(() => {
+      const r1 = document.getElementById('al1');
+      if (r1) r1.innerHTML = `<span class="check">✓</span><span style="color:var(--text2)">Rules retrieved</span>`;
+      const r2 = document.getElementById('al2');
+      if (r2) { r2.style.opacity = '1'; r2.innerHTML = `<div class="spinner"></div><span class="dot3">Extracting financial metrics…</span>`; }
+    }, 8000),
+    setTimeout(() => {
+      const r2 = document.getElementById('al2');
+      if (r2) r2.innerHTML = `<span class="check">✓</span><span style="color:var(--text2)">Metrics computed</span>`;
+      const r3 = document.getElementById('al3');
+      if (r3) { r3.style.opacity = '1'; r3.innerHTML = `<div class="spinner"></div><span class="dot3">Running CARO 2020 audit…</span>`; }
+    }, 18000),
+  ];
+
+  try {
+    // Start background task
+    const startRes = await fetch(`${API}/session/${S.sessionId}/analyze/start`, { method: 'POST' });
+    if (!startRes.ok) { const e = await startRes.json(); throw new Error(e.detail); }
+    const startData = await startRes.json();
+
+    let session;
+    if (startData.stage === 'analyzed') {
+      session = startData;
+    } else {
+      // Poll until done
+      session = await pollSession(S.sessionId, ['analyzed', 'error'], 120);
+    }
+
+    stepTimers.forEach(clearTimeout);
+    removeEl('analyze-loading');
+    S.stage = 'analyzed';
+
+    if (session.stage === 'error') throw new Error(session.error || 'Analysis failed');
+
+    S.analysisData = session.analysis;
+    setStep(3);
+    await showAnalysisResults(session);
+
+  } catch (err) {
+    stepTimers.forEach(clearTimeout);
+    removeEl('analyze-loading');
+    S.stage = 'ingested';
+    await agentMsg(`❌ Analysis failed: ${err.message}<br><small style="color:var(--text3)">Check your API quota. You can retry.</small>`);
+    addActionRow('act-analyze', [
+      { label: '↺ Retry Analysis', fn: 'confirmAnalysis()', id: 'btnAnalyze' },
+    ]);
+  }
+}
+
+async function showAnalysisResults(session) {
+  const analysis = session.analysis;
+  const cacheNote = session.cache_hit
+    ? ' <span style="font-size:10px;color:var(--green);font-family:var(--mono)">[CACHE HIT]</span>' : '';
+
+  await agentMsg(`✅ Analysis complete.${cacheNote}`);
+
+  // Parse and render calculation results
+  const calcs = analysis.calculation_results || '';
+  const rows = calcs.split('\n').filter(l => l.trim()).map(line => {
+    const parts = line.split(':');
+    if (parts.length < 2) return `<tr><td colspan="2" style="color:var(--text2)">${escHtml(line)}</td></tr>`;
+    const label = escHtml(parts[0].trim());
+    const val = escHtml(parts.slice(1).join(':').trim());
+    const flagCls = val.includes('N/A') ? 'flag-warn' : val.includes('WARNING') ? 'flag-bad' : 'flag-ok';
+    return `<tr><td>${label}</td><td class="${flagCls}">${val}</td></tr>`;
+  }).join('');
+
+  addCard('metrics-card', '📊 COMPUTED FINANCIAL METRICS',
+    `<table class="metrics-tbl">${rows || '<tr><td colspan="2" style="color:var(--text3)">No metrics extracted</td></tr>'}</table>`);
+
+  // Show findings summary
+  const findings = analysis.audit_findings || [];
+  if (findings.length) {
+    const findingText = findings.join('\n\n');
+    const highN   = (findingText.match(/HIGH/gi)   || []).length;
+    const medN    = (findingText.match(/MEDIUM/gi) || []).length;
+    const lowN    = (findingText.match(/LOW/gi)    || []).length;
+    const summary = `<span class="flag-bad">● ${highN} HIGH</span> &nbsp; <span class="flag-warn">● ${medN} MEDIUM</span> &nbsp; <span class="flag-ok">● ${lowN} LOW</span>`;
+    addCard('findings-card', `🔍 AUDIT FINDINGS — ${summary}`,
+      `<div style="font-size:12px;color:var(--text2);line-height:1.6;max-height:120px;overflow:hidden;white-space:pre-wrap">${escHtml(findingText.slice(0, 500))}…</div>`);
+  }
+
+  await agentMsg(`Ready to generate the full <strong>Independent Auditor's Report</strong>?<br><span style="font-size:11px;color:var(--text3)">~1 API call · renders in right panel</span>`);
+  addActionRow('act-report', [
+    { label: '▶ Generate Report', fn: 'confirmReport()', id: 'btnReport' },
+  ]);
+  setStep(4);
+}
+
+// ── Report ────────────────────────────────────────────────────────────────────
+async function confirmReport() {
+  removeEl('act-report');
+  userMsg('Generate Report');
+  S.stage = 'reporting';
+
+  const lc = document.createElement('div');
+  lc.className = 'loading-card'; lc.id = 'report-loading';
+  lc.innerHTML = `<div class="loading-row"><div class="spinner"></div><span class="dot3">Drafting Independent Auditor's Report…</span></div>`;
+  msgs.appendChild(lc); scrollDown();
+
+  try {
+    const startRes = await fetch(`${API}/session/${S.sessionId}/report/start`, { method: 'POST' });
+    if (!startRes.ok) { const e = await startRes.json(); throw new Error(e.detail); }
+    const startData = await startRes.json();
+
+    let session;
+    if (startData.stage === 'done') {
+      session = await fetch(`${API}/session/${S.sessionId}`).then(r => r.json());
+    } else {
+      session = await pollSession(S.sessionId, ['done', 'error'], 90);
+    }
+
+    removeEl('report-loading');
+    S.stage = 'done';
+
+    if (session.stage === 'error') throw new Error(session.error || 'Report generation failed');
+
+    const report  = session.report;
+    const opinion = report.audit_opinion || 'Disclaimer';
+    S.reportMarkdown = report.final_report || '';
+    renderReport(S.reportMarkdown, opinion);
+    setStep(4);
+
+    const opColor = opinion === 'Unqualified' ? 'var(--green)' : opinion === 'Adverse' ? 'var(--red)' : 'var(--amber)';
+    const cacheNote = session.cache_hit ? ' <span style="font-size:10px;color:var(--green);font-family:var(--mono)">[CACHE HIT]</span>' : '';
+    await agentMsg(`✅ Report generated.${cacheNote} Opinion: <strong style="color:${opColor}">${opinion}</strong><br><span style="font-size:11px;color:var(--text3)">Full report is visible in the right panel →</span>`);
+
+    addActionRow('act-done', [
+      { label: '⬇ Download .md', fn: 'downloadReport()', cls: 'secondary' },
+      { label: '+ New Audit', fn: 'newSession()', cls: 'primary' },
+    ]);
+
+  } catch (err) {
+    removeEl('report-loading');
+    S.stage = 'analyzed';
+    await agentMsg(`❌ Report failed: ${err.message}`);
+    addActionRow('act-report', [
+      { label: '↺ Retry Report', fn: 'confirmReport()', id: 'btnReport' },
+    ]);
+  }
+}
+
+// ── Polling ───────────────────────────────────────────────────────────────────
+async function pollSession(sessionId, targetStages, maxAttempts = 90) {
+  for (let i = 0; i < maxAttempts; i++) {
+    await sleep(2000);
+    const session = await fetch(`${API}/session/${sessionId}`).then(r => r.json());
+    if (targetStages.includes(session.stage)) return session;
+  }
+  throw new Error('Timed out waiting for response. Check server logs.');
+}
+
+// ── Report render ─────────────────────────────────────────────────────────────
+function renderReport(markdown, opinion) {
+  document.getElementById('reportEmpty').style.display = 'none';
+  const body = document.getElementById('reportBody');
+  body.style.display = 'block';
+  body.innerHTML = marked.parse(markdown);
+
+  const badge = document.getElementById('opinionBadge');
+  badge.textContent = opinion.toUpperCase();
+  badge.className = 'opinion-badge op-' + opinion.replace(/\s/g, '');
+  badge.style.display = 'inline-block';
+  document.getElementById('reportBtns').style.display = 'flex';
+  body.scrollTop = 0;
+}
+
+// ── Misc UI ───────────────────────────────────────────────────────────────────
+function cancelAction() { agentMsg('Cancelled. Upload a new file to start over.'); }
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function newSession() {
+  S.sessionId = null; S.fileHash = null; S.fileName = null;
+  S.stage = 'idle'; S.analysisData = null; S.reportMarkdown = '';
+  msgs.innerHTML = '';
+  document.getElementById('reportEmpty').style.display = 'flex';
+  document.getElementById('reportBody').style.display = 'none';
+  document.getElementById('opinionBadge').style.display = 'none';
+  document.getElementById('reportBtns').style.display = 'none';
+  const uz = document.getElementById('uploadZone');
+  uz.classList.remove('has-file');
+  document.getElementById('uzText').textContent = 'Drop financial PDF here';
+  document.getElementById('uzHint').textContent = 'or click to browse · PDF only';
+  document.getElementById('fileInput').value = '';
+  setStep(1);
+  welcome();
+}
+
+function downloadReport() {
+  if (!S.reportMarkdown) return;
+  const blob = new Blob([S.reportMarkdown], { type: 'text/markdown' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `audit_${S.fileName || 'report'}_${new Date().toISOString().slice(0,10)}.md`;
+  a.click();
+}
+
+function copyReport() {
+  navigator.clipboard.writeText(S.reportMarkdown).then(() => agentMsg('✓ Report copied to clipboard.'));
+}
+
+// ── History drawer ────────────────────────────────────────────────────────────
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+  loadSessionHistory();
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+async function loadSessionHistory() {
+  const list = document.getElementById('drawerList');
+  try {
+    const sessions = await fetch(`${API}/sessions/?limit=20`).then(r => r.json());
+    if (!sessions.length) {
+      list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text3);font-size:12px;">No sessions yet</div>`;
       return;
     }
-    list.innerHTML = d.sessions.map(s => `
-      <div class="session-item ${s.id === currentSessionId ? 'active' : ''}"
-           onclick="loadSession('${s.id}')">
-        <div class="session-name">${esc(s.file_name || 'Untitled')}</div>
-        <div class="session-meta">${relativeTime(s.created_at)}</div>
-        <span class="stage-pill stage-${s.stage}">${s.stage}</span>
-      </div>
-    `).join('');
-  } catch {}
-}
-
-// ── Load existing session ─────────────────────────────────────────────────────
-async function loadSession(sid) {
-  try {
-    const r = await fetch(`${API_BASE}/session/${sid}/status`);
-    const session = await r.json();
-    currentSessionId = sid;
-    switchToChatView(session.file_name || 'Document');
-
-    clearChat();
-
-    // Replay state
-    if (session.stage === 'ingested') {
-      appendAgentBubble(`✅ **${esc(session.file_name)}** was already ingested. Ready for CARO 2020 analysis.`);
-      appendAnalysisActionCard();
-    } else if (session.stage === 'analyzed') {
-      appendAgentBubble(`📊 Analysis of **${esc(session.file_name)}** is complete.`);
-      appendReportActionCard();
-    } else if (session.stage === 'done' && session.report_id) {
-      reportId = session.report_id;
-      appendAgentBubble(`🎉 Audit report for **${esc(session.file_name)}** is ready.`);
-      const rep = await fetch(`${API_BASE}/report/${session.report_id}/full`);
-      const rd = await rep.json();
-      appendReportCard(rd.final_report, session.report_id, rd.audit_opinion);
-    } else if (session.stage === 'error') {
-      appendAgentBubble(`⚠️ This session encountered an error: ${esc(session.error || 'Unknown error')}`);
-    }
-
-    loadSessionList();
-    openSSEStream(sid);
-  } catch (e) {
-    console.error(e);
-  }
-}
-
-// ── Start new session ─────────────────────────────────────────────────────────
-function startNewSession() {
-  currentSessionId = null;
-  analysisData = null;
-  reportId = null;
-  if (eventSource) { eventSource.close(); eventSource = null; }
-  document.getElementById('welcome-screen').style.display = 'flex';
-  document.getElementById('welcome-screen').style.flexDirection = 'column';
-  document.getElementById('welcome-screen').style.alignItems = 'center';
-  document.getElementById('bottom-bar').style.display = 'none';
-  document.getElementById('header-session-id').style.display = 'none';
-  document.getElementById('header-sub').textContent = 'Upload a financial PDF to begin';
-  clearChat(true);
-}
-
-// ── File handling ─────────────────────────────────────────────────────────────
-function onDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
-function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
-function onDrop(e, src) {
-  e.preventDefault(); e.currentTarget.classList.remove('drag-over');
-  const f = e.dataTransfer.files[0];
-  if (f && f.name.endsWith('.pdf')) uploadFile(f);
-}
-function onFileSelect(e, src) {
-  const f = e.target.files[0];
-  if (f) uploadFile(f);
-  e.target.value = '';
-}
-
-async function uploadFile(file) {
-  switchToChatView(file.name);
-  appendUserBubble(`📎 Uploading **${esc(file.name)}** (${(file.size/1024).toFixed(0)} KB)…`);
-  const thinking = appendThinking();
-
-  const fd = new FormData();
-  fd.append('file', file);
-  try {
-    const r = await fetch(`${API_BASE}/session/start`, {method:'POST', body:fd});
-    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
-    const d = await r.json();
-    currentSessionId = d.session_id;
-    thinking.remove();
-    document.getElementById('header-session-id').textContent = `Session ${d.session_id}`;
-    document.getElementById('header-session-id').style.display = 'block';
-    openSSEStream(d.session_id);
-    loadSessionList();
-  } catch (err) {
-    thinking.remove();
-    appendAgentBubble(`❌ Upload failed: ${esc(String(err))}`);
-  }
-}
-
-// ── SSE ───────────────────────────────────────────────────────────────────────
-function openSSEStream(sid) {
-  if (eventSource) eventSource.close();
-  eventSource = new EventSource(`${API_BASE}/session/${sid}/stream`);
-
-  eventSource.onmessage = (e) => {
-    const ev = JSON.parse(e.data);
-    handleSSEEvent(ev);
-  };
-
-  eventSource.onerror = () => {
-    // Auto-reconnects; poll status as fallback
-    setTimeout(() => pollSessionStatus(sid), 3000);
-  };
-}
-
-function handleSSEEvent(ev) {
-  switch (ev.type) {
-
-    case 'ping': break; // keepalive, ignore
-
-    case 'progress':
-      appendProgressStep(ev.message, false);
-      break;
-
-    case 'ingestion_complete':
-      markLastProgressDone();
-      appendAgentBubble(
-        `✅ I've parsed **${esc(ev.file_name)}** and extracted **${ev.text_length?.toLocaleString() || '?'} characters** of financial data.\n\n` +
-        `Shall I run a full **CARO 2020** clause-by-clause compliance analysis? This will:\n` +
-        `• Query the rules knowledge base\n• Compute financial ratios\n• Check all 21 CARO clauses`
-      );
-      appendAnalysisActionCard();
-      loadSessionList();
-      break;
-
-    case 'analysis_complete':
-      markLastProgressDone();
-      analysisData = ev;
-      appendAnalysisResult(ev);
-      appendReportActionCard();
-      loadSessionList();
-      break;
-
-    case 'report_complete':
-      markLastProgressDone();
-      reportId = ev.report_id;
-      appendAgentBubble(
-        `🎉 The **Independent Auditor's Report** is ready.\n\n` +
-        `**Audit Opinion:** ${esc(ev.audit_opinion || 'Qualified')}`
-      );
-      appendReportCard(ev.final_report, ev.report_id, ev.audit_opinion);
-      loadSessionList();
-      if (eventSource) { eventSource.close(); eventSource = null; }
-      break;
-
-    case 'error':
-      markLastProgressDone();
-      appendAgentBubble(`⚠️ **Something went wrong:** ${esc(ev.message)}`);
-      loadSessionList();
-      break;
-
-    case 'reconnect_state':
-      // Already handled via loadSession()
-      break;
-
-    case 'stream_end':
-      if (eventSource) { eventSource.close(); eventSource = null; }
-      break;
-  }
-}
-
-// ── Polling fallback ──────────────────────────────────────────────────────────
-async function pollSessionStatus(sid) {
-  if (sid !== currentSessionId) return;
-  try {
-    const r = await fetch(`${API_BASE}/session/${sid}/status`);
-    const s = await r.json();
-    if (s.stage === 'done' && s.report_id && !reportId) {
-      await loadSession(sid);
-    }
-  } catch {}
-}
-
-// ── Analysis & Report triggers ────────────────────────────────────────────────
-async function triggerAnalysis() {
-  disableActionCard();
-  appendUserBubble('✅ Yes — run CARO 2020 analysis');
-  try {
-    const r = await fetch(`${API_BASE}/session/${currentSessionId}/analyze`, {method:'POST'});
-    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
-  } catch (err) {
-    appendAgentBubble(`❌ Could not start analysis: ${esc(String(err))}`);
-  }
-}
-
-async function triggerReport() {
-  disableActionCard();
-  appendUserBubble('📝 Yes — generate the audit report');
-  try {
-    const r = await fetch(`${API_BASE}/session/${currentSessionId}/report`, {method:'POST'});
-    if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
-  } catch (err) {
-    appendAgentBubble(`❌ Could not start report: ${esc(String(err))}`);
-  }
-}
-
-// ── DOM helpers ───────────────────────────────────────────────────────────────
-function clearChat(keepWelcome=false) {
-  const msgs = document.getElementById('chat-messages');
-  msgs.innerHTML = keepWelcome
-    ? document.getElementById('welcome-screen')?.outerHTML || ''
-    : '';
-}
-
-function switchToChatView(fileName) {
-  document.getElementById('welcome-screen')?.remove?.();
-  document.getElementById('bottom-bar').style.display = 'block';
-  document.getElementById('header-sub').textContent = fileName;
-}
-
-function scrollBottom() {
-  const c = document.getElementById('chat-messages');
-  c.scrollTop = c.scrollHeight;
-}
-
-function appendAgentBubble(mdText) {
-  const wrap = document.createElement('div');
-  wrap.className = 'message';
-  wrap.innerHTML = `
-    <div class="avatar agent">🤖</div>
-    <div class="bubble agent">${marked.parse(mdText)}</div>
-  `;
-  document.getElementById('chat-messages').appendChild(wrap);
-  scrollBottom();
-  return wrap;
-}
-
-function appendUserBubble(mdText) {
-  const wrap = document.createElement('div');
-  wrap.className = 'message user';
-  wrap.innerHTML = `
-    <div class="avatar user-av">👤</div>
-    <div class="bubble user">${marked.parse(mdText)}</div>
-  `;
-  document.getElementById('chat-messages').appendChild(wrap);
-  scrollBottom();
-  return wrap;
-}
-
-function appendThinking() {
-  const wrap = document.createElement('div');
-  wrap.className = 'message';
-  wrap.innerHTML = `
-    <div class="avatar agent">🤖</div>
-    <div class="bubble agent">
-      <div class="thinking"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
-    </div>`;
-  document.getElementById('chat-messages').appendChild(wrap);
-  scrollBottom();
-  return wrap;
-}
-
-let _lastProgressEl = null;
-function appendProgressStep(msg, done=false) {
-  const el = document.createElement('div');
-  el.className = 'progress-msg';
-  el.innerHTML = done
-    ? `<span class="progress-check">✓</span><span>${esc(msg)}</span>`
-    : `<div class="progress-spinner"></div><span>${esc(msg)}</span>`;
-  document.getElementById('chat-messages').appendChild(el);
-  _lastProgressEl = el;
-  scrollBottom();
-  return el;
-}
-
-function markLastProgressDone() {
-  if (_lastProgressEl) {
-    const text = _lastProgressEl.querySelector('span')?.textContent || '';
-    _lastProgressEl.innerHTML = `<span class="progress-check">✓</span><span>${esc(text)}</span>`;
-    _lastProgressEl = null;
-  }
-}
-
-function appendAnalysisActionCard() {
-  const el = document.createElement('div');
-  el.className = 'action-card';
-  el.id = 'current-action-card';
-  el.innerHTML = `
-    <div class="action-card-title">Run CARO 2020 Compliance Analysis?</div>
-    <div class="action-card-sub">
-      This will query the pre-ingested rules knowledge base, compute financial ratios
-      using Python, and perform a clause-by-clause CARO 2020 assessment. 
-      Typically takes 1–3 minutes on free-tier API.
-    </div>
-    <div class="action-btns">
-      <button class="btn-primary" onclick="triggerAnalysis()">Yes, run analysis →</button>
-      <button class="btn-secondary" onclick="startNewSession()">Upload different file</button>
-    </div>`;
-  document.getElementById('chat-messages').appendChild(el);
-  scrollBottom();
-}
-
-function appendReportActionCard() {
-  const el = document.createElement('div');
-  el.className = 'action-card';
-  el.id = 'current-action-card';
-  el.innerHTML = `
-    <div class="action-card-title">Generate Independent Auditor's Report?</div>
-    <div class="action-card-sub">
-      I'll now synthesize all findings into a formal publication-ready audit report
-      following ISA 700/705/706 and CARO 2020 standards. Takes ~1 minute.
-    </div>
-    <div class="action-btns">
-      <button class="btn-primary" onclick="triggerReport()">Yes, generate report →</button>
-      <button class="btn-secondary" onclick="startNewSession()">Start over</button>
-    </div>`;
-  document.getElementById('chat-messages').appendChild(el);
-  scrollBottom();
-}
-
-function appendAnalysisResult(ev) {
-  const el = document.createElement('div');
-  el.className = 'message';
-  el.innerHTML = `<div class="avatar agent">🤖</div><div style="flex:1;max-width:72%">
-    <div class="bubble agent" style="border-bottom-left-radius:4px">
-      ${marked.parse(
-        `📊 **CARO 2020 analysis complete.** Here's a summary of findings:`
-      )}
-    </div>
-    <div class="findings-card">
-      <div class="findings-header" onclick="toggleFindings(this)">
-        <div class="findings-header-left">
-          🔍 Audit Findings
-          <div class="severity-chips">
-            <span class="chip chip-high">HIGH ${ev.high_count||0}</span>
-            <span class="chip chip-medium">MED ${ev.medium_count||0}</span>
-            <span class="chip chip-low">LOW ${ev.low_count||0}</span>
-          </div>
+    list.innerHTML = sessions.map(s => {
+      const stageCls = s.stage === 'done' ? 'ss-done' : s.stage?.includes('ing') ? 'ss-analyzing' : s.stage === 'error' ? 'ss-error' : 'ss-other';
+      const dt = s.created_at ? new Date(s.created_at).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+      return `<div class="sess-item" onclick="loadSession('${s.id}')">
+        <div class="sess-name">${escHtml(s.file_name || 'Unknown file')}</div>
+        <div class="sess-meta">
+          <span class="sess-stage ${stageCls}">${s.stage}</span>
+          <span class="sess-date">${dt}</span>
         </div>
-        <span class="findings-toggle">Show ▾</span>
-      </div>
-      <div class="findings-body" style="display:none">${esc(ev.findings_preview||'')}</div>
-    </div>
-  </div>`;
-  document.getElementById('chat-messages').appendChild(el);
-  scrollBottom();
-}
-
-function toggleFindings(header) {
-  const body = header.nextElementSibling;
-  const toggle = header.querySelector('.findings-toggle');
-  if (body.style.display === 'none') {
-    body.style.display = 'block';
-    toggle.textContent = 'Hide ▴';
-  } else {
-    body.style.display = 'none';
-    toggle.textContent = 'Show ▾';
+      </div>`;
+    }).join('');
+  } catch {
+    list.innerHTML = `<div style="padding:20px;text-align:center;color:var(--red);font-size:12px;">Failed to load sessions</div>`;
   }
 }
 
-function appendReportCard(reportMd, repId, opinion) {
-  const el = document.createElement('div');
-  el.className = 'report-card';
-  el.innerHTML = `
-    <div class="report-card-header">
-      <div>
-        <div class="report-card-title">Independent Auditor's Report</div>
-        <div class="report-card-meta">ID: ${esc(repId)} · Opinion: ${esc(opinion||'—')}</div>
-      </div>
-      <div class="report-actions">
-        <button class="btn-icon" onclick="copyReport()">⎘ Copy</button>
-        <button class="btn-icon" onclick="downloadReport('${esc(repId)}')">↓ Download</button>
-      </div>
-    </div>
-    <div class="report-body">${marked.parse(reportMd||'*(Report content unavailable)*')}</div>`;
-  document.getElementById('chat-messages').appendChild(el);
-  scrollBottom();
-}
-
-function disableActionCard() {
-  const card = document.getElementById('current-action-card');
-  if (card) {
-    card.querySelectorAll('button').forEach(b => b.disabled = true);
-    card.id = '';
-  }
-}
-
-// ── Report export ─────────────────────────────────────────────────────────────
-function copyReport() {
-  const body = document.querySelector('.report-body');
-  if (!body) return;
-  // Get inner text for clean copy
-  const range = document.createRange();
-  range.selectNodeContents(body);
-  const sel = window.getSelection();
-  sel.removeAllRanges();
-  sel.addRange(range);
-  document.execCommand('copy');
-  sel.removeAllRanges();
-  // Tiny feedback
-  const btn = event.currentTarget;
-  btn.textContent = '✓ Copied';
-  setTimeout(() => btn.textContent = '⎘ Copy', 1800);
-}
-
-async function downloadReport(repId) {
+async function loadSession(sessionId) {
+  closeDrawer();
   try {
-    const r = await fetch(`${API_BASE}/report/${repId}`);
-    const text = await r.text();
-    const blob = new Blob([text], {type:'text/markdown'});
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `audit_report_${repId}.md`;
-    a.click();
-  } catch { alert('Download failed. Try again.'); }
+    const session = await fetch(`${API}/session/${sessionId}`).then(r => r.json());
+    newSession();
+    S.sessionId = sessionId;
+    S.fileHash  = session.file_hash;
+    S.fileName  = session.file_name;
+
+    await agentMsg(`📂 Loaded session: <strong>${escHtml(session.file_name || sessionId)}</strong>`);
+
+    if (session.report?.final_report) {
+      S.stage = 'done';
+      S.reportMarkdown = session.report.final_report;
+      S.analysisData   = session.analysis;
+      renderReport(S.reportMarkdown, session.report.audit_opinion || 'Qualified');
+      setStep(4);
+      await agentMsg(`✅ Report loaded from session. Opinion: <strong>${session.report.audit_opinion}</strong>`);
+      addActionRow('act-done2', [
+        { label: '⬇ Download .md', fn: 'downloadReport()', cls: 'secondary' },
+        { label: '+ New Audit', fn: 'newSession()', cls: 'primary' },
+      ]);
+    } else if (session.analysis) {
+      S.stage = 'analyzed';
+      S.analysisData = session.analysis;
+      setStep(3);
+      await showAnalysisResults(session);
+    } else {
+      await agentMsg(`Session found but no completed analysis. Upload the PDF again to continue.`);
+    }
+  } catch (err) {
+    await agentMsg(`❌ Could not load session: ${err.message}`);
+  }
 }
 
-// ── Utilities ─────────────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-                      .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+// ── File input / drag-drop ────────────────────────────────────────────────────
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) handleUpload(e.target.files[0]);
+});
+
+const uz = document.getElementById('uploadZone');
+uz.addEventListener('dragover', e => { e.preventDefault(); uz.classList.add('drag-over'); });
+uz.addEventListener('dragleave', () => uz.classList.remove('drag-over'));
+uz.addEventListener('drop', e => {
+  e.preventDefault(); uz.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleUpload(e.dataTransfer.files[0]);
+});
+
+// ── Welcome ───────────────────────────────────────────────────────────────────
+async function welcome() {
+  await agentMsg(
+    `Welcome to <strong>FinAudit AI</strong> — autonomous financial audit platform.<br>
+     Upload a financial PDF to begin a CARO 2020 compliance audit.<br>
+     <span style="font-size:11px;color:var(--text3)">Steps: Parse → Analyze → Audit → Report</span>`,
+    true
+  );
 }
 
-function relativeTime(iso) {
-  if (!iso) return '';
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff/60000);
-  if (m < 1) return 'Just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m/60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h/24)}d ago`;
-}
-
-// Configure marked
-marked.setOptions({ breaks: true, gfm: true });
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadRulesStatus();
+welcome();
 </script>
 </body>
 </html>

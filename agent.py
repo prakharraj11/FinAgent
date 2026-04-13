@@ -1,23 +1,22 @@
 """
-Document Ingestion Agent  (v3.0 — LightRAG removed)
-=====================================================
-Why LightRAG was removed
-------------------------
+Document Ingestion Agent  (v3.1 — embedding cache added)
+=========================================================
+Why LightRAG was removed  (from v3.0)
+--------------------------------------
 LightRAG's KG construction called Gemini once per text chunk (15-30 LLM
-calls per document) for entity/relation extraction. However, the RAG
-analysis agent already noted: "LightRAG KG returns None for all document
-queries in practice" — meaning the KG was never actually used.
-
+calls per document). The RAG analysis agent already noted: "LightRAG KG
+returns None for all document queries in practice" — the KG was never used.
 The analysis pipeline reads raw_text directly, and the rules knowledge base
 uses ChromaDB (pre-ingested, cheap). Removing LightRAG saves 70-80% of
 API quota usage per run with zero loss of functionality.
 
-What remains
-------------
-- PDF parsing   (PyMuPDF + pytesseract OCR fallback)
-- gemini_embed  (still needed for ChromaDB rules queries)
-- LLM retry helper (_invoke_with_retry)
-- ingestion_agent (simple: parse → END, no KG build)
+Changes in v3.1
+---------------
+- gemini_embed now uses embedding_cache.py — identical text is embedded
+  ONCE and then served from disk forever. On free tier this means the
+  3 fixed librarian rule queries cost 0 API calls after the first run.
+- Graceful ImportError fallback: if embedding_cache.py is missing the
+  function still works, just without caching.
 """
 
 import os
@@ -91,12 +90,25 @@ async def _invoke_with_retry(llm: ChatGoogleGenerativeAI, messages) -> str:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Embedding (still needed for ChromaDB rules queries)
+# Embedding — with disk cache to protect free-tier quota
 # ──────────────────────────────────────────────────────────────────────────────
+try:
+    from embedding_cache import get_cached_embedding, save_cached_embedding
+    _EMBED_CACHE_AVAILABLE = True
+except ImportError:
+    _EMBED_CACHE_AVAILABLE = False
+
+
 async def gemini_embed(texts: list[str]) -> np.ndarray:
     """
     Embed texts using gemini-embedding-001 via the google-genai SDK.
-    Rate-limit friendly: embeds one at a time with 429 retry logic.
+
+    v3.1 — Checks disk cache first. Identical text (e.g., the 3 fixed
+    librarian rule queries) is embedded ONCE; all subsequent calls are
+    served from disk with zero API quota usage.
+
+    Rate-limit friendly: still embeds one at a time with 429 retry logic
+    for any texts that are not cached.
     """
     client = _get_genai_client()
     vectors = []
@@ -105,6 +117,14 @@ async def gemini_embed(texts: list[str]) -> np.ndarray:
         texts = [texts]
 
     for text in texts:
+        # ── Cache hit ──────────────────────────────────────────────────
+        if _EMBED_CACHE_AVAILABLE:
+            cached = get_cached_embedding(text)
+            if cached is not None:
+                vectors.append(cached.tolist())
+                continue  # zero API calls for this text
+
+        # ── Cache miss → call Gemini ──────────────────────────────────
         for attempt in range(3):
             try:
                 response = await client.aio.models.embed_content(
@@ -115,7 +135,13 @@ async def gemini_embed(texts: list[str]) -> np.ndarray:
                         "output_dimensionality": 768,
                     },
                 )
-                vectors.append(list(response.embeddings[0].values))
+                vec = list(response.embeddings[0].values)
+
+                # Persist to cache so this text is free next time
+                if _EMBED_CACHE_AVAILABLE:
+                    save_cached_embedding(text, np.array(vec, dtype=np.float32))
+
+                vectors.append(vec)
                 break
             except Exception as e:
                 if "429" in str(e) and attempt < 2:
@@ -129,8 +155,7 @@ async def gemini_embed(texts: list[str]) -> np.ndarray:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# LLM wrapper (kept for compatibility — used nowhere after LightRAG removal
-# but harmless to keep; rag_analysis_agent imports it)
+# LLM wrapper (kept for compatibility — used by rag_analysis_agent imports)
 # ──────────────────────────────────────────────────────────────────────────────
 async def gemini_complete(prompt: str, **kwargs) -> str:
     llm = _get_llm()
