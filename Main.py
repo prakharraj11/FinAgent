@@ -140,6 +140,13 @@ def _save_report(report_data: dict) -> str:
     return report_id
 
 
+def _load_report(report_id: str):
+    path = Path(REPORTS_DIR) / f"{report_id}.json"
+    if not path.exists():
+        return None
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
 # ── Pydantic models ───────────────────────────────────────────────────────────
 class RulesIngestResponse(BaseModel):
     status: str; pdfs_ingested: int; chunks_stored: int; skipped: int; message: str
@@ -800,6 +807,14 @@ async def last_run_status():
         return LastRunResponse(cached=False)
     return LastRunResponse(cached=True, file_name=cache.get("file_name"),
                            text_length=len(cache.get("raw_text", "")))
+
+
+
+@app.get("/health", tags=["UI"])
+async def health_check():
+    """JSON health check used by the frontend status panel."""
+    rules = rules_db_status()
+    return {"status": "ok", "rules_kb": rules}
 
 
 @app.get("/", tags=["UI"])
