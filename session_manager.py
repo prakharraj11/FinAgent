@@ -16,8 +16,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-SESSION_DIR   = "./sessions"
-DOC_CACHE_DIR = "./doc_cache"
+_DATA         = os.getenv("DATA_DIR", ".")
+SESSION_DIR   = os.path.join(_DATA, "sessions")
+DOC_CACHE_DIR = os.path.join(_DATA, "doc_cache")
 MAX_CACHED_DOCS = 10
 
 for _d in [SESSION_DIR, DOC_CACHE_DIR]:
