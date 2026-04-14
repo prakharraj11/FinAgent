@@ -81,10 +81,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR     = "./temp_uploads"
-REPORTS_DIR    = "./audit_reports"
-RULES_DIR      = "./rules_docs"
-LAST_RUN_CACHE = "./last_run_cache.json"
+# All paths respect DATA_DIR env var so a Render Disk at /data works out of the box
+_DATA = os.getenv("DATA_DIR", ".")
+UPLOAD_DIR     = os.path.join(_DATA, "temp_uploads")
+REPORTS_DIR    = os.path.join(_DATA, "audit_reports")
+RULES_DIR      = os.path.join(_DATA, "rules_docs")
+LAST_RUN_CACHE = os.path.join(_DATA, "last_run_cache.json")
 
 for _d in (UPLOAD_DIR, REPORTS_DIR, RULES_DIR):
     os.makedirs(_d, exist_ok=True)
@@ -809,10 +811,9 @@ async def last_run_status():
                            text_length=len(cache.get("raw_text", "")))
 
 
-
 @app.get("/health", tags=["UI"])
 async def health_check():
-    """JSON health check used by the frontend status panel."""
+    """JSON health — used by frontend status panel."""
     rules = rules_db_status()
     return {"status": "ok", "rules_kb": rules}
 
